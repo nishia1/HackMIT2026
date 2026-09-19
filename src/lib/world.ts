@@ -7,7 +7,7 @@ import {
 } from "@/server/services/strings";
 import { currentUserId } from "@/server/services/session";
 import type { Discovery, Nudge, StringView } from "@/lib/types";
-import { listUsers } from "@/server/repo/users";
+import { findAll } from "@/server/repo/users";
 
 /**
  * THE SEAM
