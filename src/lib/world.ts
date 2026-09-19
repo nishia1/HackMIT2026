@@ -7,6 +7,7 @@ import {
 } from "@/server/services/strings";
 import { currentUserId } from "@/server/services/session";
 import type { Discovery, Nudge, StringView } from "@/lib/types";
+import { listUsers } from "@/server/repo/users";
 
 /**
  * THE SEAM
@@ -44,4 +45,16 @@ export async function loadString(
 
 export async function loadDiscoveries(limit = 12): Promise<Discovery[]> {
   return getDiscoveries(currentUserId(), limit);
+}
+
+/**
+ * Everyone available to tag as an attendee when importing an event.
+ * Excludes you — you were obviously there, no need to tag yourself.
+ */
+export async function getPeople(): Promise<{ id: string; name: string; emoji: string | null }[]> {
+  const me = currentUserId();
+  const users = await listUsers();
+  return users
+    .filter((u) => u.id !== me)
+    .map((u) => ({ id: u.id, name: u.name, emoji: u.emoji }));
 }
