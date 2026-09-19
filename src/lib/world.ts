@@ -90,6 +90,13 @@ export async function getPerson(id: string): Promise<PersonView | null> {
   return bundle ? toView(bundle) : null;
 }
 
+/** Everyone you could have been with in a photo. */
+export async function getPeople() {
+  return [...graph.nodes.values()]
+    .filter((n) => n.type === "PERSON" && n.id !== me.id)
+    .map((n) => ({ id: n.id, name: n.name, emoji: n.emoji }));
+}
+
 /** "What if I wanted to meet more people in robotics?" */
 export async function askWhatIf(query: string) {
   const needle = query.trim().toLowerCase();
