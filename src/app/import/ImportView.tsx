@@ -23,12 +23,12 @@ export default function ImportView({ people }: { people: Person[] }) {
   const [tags, setTags] = useState<Record<string, string[]>>({});
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(0);
+  const [saved, setSaved] = useState<{ added: number; skipped: number } | null>(null);
 
   async function scan() {
     setScanning(true);
     setError(null);
-    setSaved(0);
+    setSaved(null);
     try {
       const res = await fetch("/api/import", {
         method: "POST",
@@ -61,6 +61,7 @@ export default function ImportView({ people }: { people: Person[] }) {
 
   function confirm() {
     const byId = new Map(people.map((p) => [p.id, p.name]));
+    const known = new Set(events.map((e) => e.id));
     save(
       tagged.map((c: Candidate) => {
         const attendeeIds = tags[c.id] ?? [];
@@ -75,13 +76,15 @@ export default function ImportView({ people }: { people: Person[] }) {
         };
       }),
     );
-    setSaved(tagged.length);
+    const added = tagged.filter((c) => !known.has(c.id)).length;
+    setSaved({ added, skipped: tagged.length - added });
     setResult(null);
     setTags({});
   }
 
+  // The tab bar is fixed to the bottom; without this the last button sits under it.
   return (
-    <div className="pt-8">
+    <div className="pb-16 pt-8">
       <h1 className="font-display text-3xl">Import your camera roll</h1>
       <p className="mt-1 text-inkSoft">
         We read the dates on your photos — never the files themselves — and work out
@@ -102,13 +105,21 @@ export default function ImportView({ people }: { people: Person[] }) {
         </p>
       )}
 
-      {saved > 0 && (
+      {saved && (
         <p className="mt-4 text-inkSoft">
-          Saved {plural(saved, "event")}. Your strings just got thicker —{" "}
-          <Link href="/circle" className="underline">
-            see your circle
-          </Link>
-          .
+          {saved.added > 0 ? (
+            <>
+              Saved {plural(saved.added, "event")}. Your strings just got thicker —{" "}
+              <Link href="/circle" className="underline">
+                see your circle
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              Already imported — {plural(saved.skipped, "event")} left as {saved.skipped === 1 ? "it was" : "they were"}.
+            </>
+          )}
         </p>
       )}
 
@@ -169,7 +180,13 @@ export default function ImportView({ people }: { people: Person[] }) {
               </li>
             ))}
           </ul>
-          <button onClick={clear} className="mt-6 text-sm text-inkSoft underline">
+          <button
+            onClick={() => {
+              clear();
+              setSaved(null);
+            }}
+            className="mt-6 text-sm text-inkSoft underline"
+          >
             Clear imported events
           </button>
         </section>

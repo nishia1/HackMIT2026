@@ -7,6 +7,7 @@ import type { PhotoMeta } from "@/server/domain/cluster";
  */
 
 const API = "https://api.dropboxapi.com/2";
+const OAUTH = "https://api.dropboxapi.com/oauth2/token";
 
 const IMAGE = /\.(jpe?g|png|heic|heif|webp|gif)$/i;
 
@@ -18,6 +19,55 @@ type ListEntry = {
 };
 
 type ListResponse = { entries: ListEntry[]; cursor: string; has_more: boolean };
+
+/**
+ * Access tokens last four hours, which is shorter than a hackathon. A refresh
+ * token plus the app key and secret buys a fresh one on demand; the cached
+ * token is kept in module scope so a burst of requests does one exchange.
+ */
+let cached: { token: string; expiresAt: number } | null = null;
+
+export async function accessToken(): Promise<string> {
+  const direct = process.env.DROPBOX_ACCESS_TOKEN;
+  if (direct) return direct;
+
+  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
+  const key = process.env.DROPBOX_APP_KEY;
+  const secret = process.env.DROPBOX_APP_SECRET;
+  if (!refreshToken || !key || !secret) {
+    throw new Error("Dropbox is not configured");
+  }
+
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
+
+  const res = await fetch(OAUTH, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${key}:${secret}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
+  });
+  if (!res.ok) {
+    throw new Error(`Dropbox token refresh failed (${res.status}): ${await res.text()}`);
+  }
+
+  const { access_token, expires_in } = (await res.json()) as {
+    access_token: string;
+    expires_in: number;
+  };
+  cached = { token: access_token, expiresAt: Date.now() + expires_in * 1000 };
+  return access_token;
+}
+
+export function isConfigured(): boolean {
+  return Boolean(
+    process.env.DROPBOX_ACCESS_TOKEN ||
+      (process.env.DROPBOX_REFRESH_TOKEN &&
+        process.env.DROPBOX_APP_KEY &&
+        process.env.DROPBOX_APP_SECRET),
+  );
+}
 
 async function call<T>(token: string, endpoint: string, body: unknown): Promise<T> {
   const res = await fetch(`${API}${endpoint}`, {

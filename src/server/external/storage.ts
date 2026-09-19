@@ -1,4 +1,4 @@
-import { listFolder, temporaryLinks } from "@/server/external/dropbox";
+import { accessToken, isConfigured, listFolder, temporaryLinks } from "@/server/external/dropbox";
 import { fixtureRoll } from "@/server/external/fixtureRoll";
 import type { PhotoMeta } from "@/server/domain/cluster";
 
@@ -18,11 +18,11 @@ export type PhotoSource = {
 
 const FOLDER = process.env.DROPBOX_CAMERA_FOLDER ?? "/Camera Uploads";
 
-function dropboxSource(token: string): PhotoSource {
+function dropboxSource(): PhotoSource {
   return {
     kind: "dropbox",
-    list: () => listFolder(token, FOLDER),
-    links: (paths) => temporaryLinks(token, paths),
+    list: async () => listFolder(await accessToken(), FOLDER),
+    links: async (paths) => temporaryLinks(await accessToken(), paths),
   };
 }
 
@@ -35,6 +35,5 @@ function fixtureSource(): PhotoSource {
 }
 
 export function photoSource(): PhotoSource {
-  const token = process.env.DROPBOX_ACCESS_TOKEN;
-  return token ? dropboxSource(token) : fixtureSource();
+  return isConfigured() ? dropboxSource() : fixtureSource();
 }

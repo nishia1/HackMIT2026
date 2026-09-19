@@ -9,7 +9,8 @@
     "lint": "next lint",
     "check": "tsc --noEmit",
     "verify": "tsx scripts/verify-demo.ts",
-    "verify:import": "tsx scripts/verify-import.ts"
+    "verify:import": "tsx scripts/verify-import.ts",
+    "dropbox:auth": "tsx scripts/dropbox-authorize.ts"
   },
   "dependencies": {
     "next": "^15.0.3",
