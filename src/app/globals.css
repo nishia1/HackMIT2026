@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: #edeaf2;
+  --paper-deep: #dfdae9;
+  --ink: #221b3a;
+  --ink-soft: #5a5175;
+  --string: #e2483d;
+  --field: #0f7c7b;
+  --stamp: #f2c14e;
+}
+
+html,
+body {
+  height: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  /* Faint plotted grid: the world is a map you haven't finished surveying. */
+  background-image: radial-gradient(var(--paper-deep) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* The one piece of motion in the app: a thread drawing itself. */
+@keyframes draw-thread {
+  from {
+    stroke-dashoffset: var(--len, 400);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.thread-draw {
+  stroke-dasharray: var(--len, 400);
+  animation: draw-thread 900ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thread-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--string);
+  outline-offset: 3px;
+}
+
+.stamp-edge {
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 3px currentColor;
+}

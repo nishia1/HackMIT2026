@@ -1,0 +1,16 @@
+{
+  "name": "Invisible String",
+  "short_name": "String",
+  "description": "There are more connections around you than you can see.",
+  "start_url": "/circle",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EDEAF2",
+  "theme_color": "#EDEAF2",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
