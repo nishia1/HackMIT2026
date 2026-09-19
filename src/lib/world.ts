@@ -53,8 +53,8 @@ export async function loadDiscoveries(limit = 12): Promise<Discovery[]> {
  */
 export async function getPeople(): Promise<{ id: string; name: string; emoji: string | null }[]> {
   const me = currentUserId();
-  const users = await listUsers();
+  const users = await findAll();
   return users
-    .filter((u) => u.id !== me)
-    .map((u) => ({ id: u.id, name: u.name, emoji: u.emoji }));
+    .filter((u) => u._id !== me)
+    .map((u) => ({ id: u._id, name: u.name, emoji: u.emoji ?? null }));
 }
