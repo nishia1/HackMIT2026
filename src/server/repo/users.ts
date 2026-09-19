@@ -19,3 +19,9 @@ export async function findManyByIds(ids: string[]): Promise<Map<string, UserDoc>
     : demoWorld().users.filter((u) => ids.includes(u._id));
   return new Map(docs.map((u) => [u._id, u]));
 }
+
+export async function findAll(): Promise<UserDoc[]> {
+  const db = await getDb();
+  if (!db) return demoWorld().users;
+  return db.collection<UserDoc>(COLLECTIONS.users).find({}).toArray();
+}
