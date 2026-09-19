@@ -56,5 +56,5 @@ export async function getPeople(): Promise<{ id: string; name: string; emoji: st
   const users = await findAll();
   return users
     .filter((u) => u._id !== me)
-    .map((u) => ({ id: u._id, name: u.name, emoji: u.emoji ?? null }));
+    .map((u) => ({ id: u._id, name: u.name, emoji: u.avatarUrl }));
 }
