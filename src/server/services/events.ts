@@ -1,8 +1,8 @@
-import { eventsWithPerson, peopleByRecency, saveEvents } from "@/server/repo/events";
+import { eventsWithPerson, findShared, peopleByRecency, saveEvents } from "@/server/repo/events";
 import { link } from "@/server/repo/friends";
 import { emojiFor } from "@/server/domain/label";
 import { photoUrl } from "@/lib/photo";
-import type { EventDoc, Memory, StampView } from "@/lib/types";
+import type { EventDoc, Memory, PhotoTile, StampView } from "@/lib/types";
 
 /**
  * Confirmed events, and the read the connection screen is built on.
@@ -124,4 +124,59 @@ export async function stampsFor(meId: string, personId: string): Promise<StampVi
  */
 export async function recentCompanions(meId: string): Promise<string[]> {
   return (await peopleByRecency(meId)).map((p) => p.personId);
+}
+
+/**
+ * The photos on one connection's screen: your own shots of the events you and
+ * this person were both at, newest first.
+ *
+ * Only ever your own uploads. A shared event is several people's cameras, and
+ * showing someone else's would mean asking their Dropbox for a file on your
+ * behalf — so the rule is simply that you see what you took.
+ *
+ * Six different outings reads as a history; six frames of one dinner reads as
+ * a camera roll. So take one photo per event first, and only go back for
+ * seconds once there are no more events to draw from.
+ */
+export async function photosWith(
+  meId: string,
+  personId: string,
+  limit: number,
+): Promise<PhotoTile[]> {
+  const events = await findShared(meId, personId);
+
+  const mine = events.map((event) => ({
+    event,
+    memories: event.memories.filter(
+      (m): m is Memory & { dropboxPath: string } =>
+        Boolean(m.dropboxPath) && m.addedBy === meId,
+    ),
+  }));
+
+  const tiles: PhotoTile[] = [];
+  const take = (m: Memory & { dropboxPath: string }, event: EventDoc) => {
+    tiles.push({
+      src: photoUrl(m.dropboxPath, m.addedBy),
+      alt: m.caption ?? event.title,
+    });
+  };
+
+  // One per event, newest event first.
+  for (const { event, memories } of mine) {
+    if (tiles.length >= limit) break;
+    if (memories[0]) take(memories[0], event);
+  }
+
+  // Then seconds, thirds… from the same events, until the boxes are full or
+  // we genuinely run out of photos.
+  for (let depth = 1; tiles.length < limit; depth++) {
+    const before = tiles.length;
+    for (const { event, memories } of mine) {
+      if (tiles.length >= limit) break;
+      if (memories[depth]) take(memories[depth], event);
+    }
+    if (tiles.length === before) break; // nothing left at this depth
+  }
+
+  return tiles;
 }

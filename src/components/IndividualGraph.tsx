@@ -54,18 +54,29 @@ const FILLER_BOXES: { x: number; y: number; w: number; h: number; dashed?: boole
   { x: 160, y: 305, w: 71, h: 51 },
 ];
 
+import type { PhotoTile } from "@/lib/types";
+
 function pct(value: number, extent: number): string {
   return `${(value / extent) * 100}%`;
 }
 
+/** How many boxes a photo can actually go in — the dashed one stays empty. */
+export const PHOTO_SLOTS = FILLER_BOXES.filter((b) => !b.dashed).length;
+
 export default function IndividualGraph({
   otherName,
   yourName = "YOU",
+  photos = [],
   footer,
   variant = "page",
 }: {
   /** The person this connection is with — shown at the top of the pair. */
   otherName: string;
+  /**
+   * Your photos of the two of you, newest first, filling the solid boxes in
+   * order. Fewer than `PHOTO_SLOTS` is normal — the rest stay grey.
+   */
+  photos?: PhotoTile[];
   /** The signed-in user — shown at the bottom, matching GroupGraph's "you". */
   yourName?: string;
   /** Rendered on the paper just below the pair, inside the frame. */
@@ -93,6 +104,18 @@ export default function IndividualGraph({
   const bottomChar = sp(BOTTOM_CHAR.x, BOTTOM_CHAR.y);
   const thickStart = sp(THICK_LINE[0], THICK_LINE[1]);
   const thickEnd = sp(THICK_LINE[2], THICK_LINE[3]);
+  /**
+   * Which photo each box gets: its index among the *solid* boxes, so the
+   * dashed slot sitting in the middle of the list doesn't consume one and
+   * leave a gap after it.
+   */
+  const solidBefore: number[] = [];
+  let solidCount = 0;
+  for (const box of FILLER_BOXES) {
+    solidBefore.push(solidCount);
+    if (!box.dashed) solidCount++;
+  }
+
   const fillerBoxes = FILLER_BOXES.map((box) => {
     const center = sp(box.x + box.w / 2, box.y + box.h / 2);
     const w = box.w * scale;
@@ -159,22 +182,40 @@ export default function IndividualGraph({
         />
       </svg>
 
-      {fillerBoxes.map((box, i) => (
-        <div
-          key={i}
-          className={
-            box.dashed
-              ? "absolute rounded-[9px] border border-dashed border-[#6d0000] bg-[rgba(255,185,185,0.38)]"
-              : "absolute rounded-[9px] bg-[#d9d9d9]"
-          }
-          style={{
-            left: pct(box.x, FRAME_W),
-            top: pct(box.y, totalH),
-            width: pct(box.w, FRAME_W),
-            height: pct(box.h, totalH),
-          }}
-        />
-      ))}
+      {fillerBoxes.map((box, i) => {
+        /*
+          Photos fill the solid boxes in order, newest first. The dashed box
+          is the design's "room for more" slot and is deliberately left
+          empty, so it never takes a photo and never counts toward one.
+        */
+        const photo = box.dashed ? undefined : photos[solidBefore[i]];
+        return (
+          <div
+            key={i}
+            className={
+              box.dashed
+                ? "absolute overflow-hidden rounded-[9px] border border-dashed border-[#6d0000] bg-[rgba(255,185,185,0.38)]"
+                : "absolute overflow-hidden rounded-[9px] bg-[#d9d9d9]"
+            }
+            style={{
+              left: pct(box.x, FRAME_W),
+              top: pct(box.y, totalH),
+              width: pct(box.w, FRAME_W),
+              height: pct(box.h, totalH),
+            }}
+          >
+            {photo && (
+              // Not next/image: these are proxied bytes, not a known-size asset.
+              <img
+                src={photo.src}
+                alt={photo.alt}
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            )}
+          </div>
+        );
+      })}
 
       <img
         src={CHAR_SRC}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRef } from "react";
 import IndividualGraph, { HIGHLIGHTS_ASPECT } from "@/components/IndividualGraph";
 import SaveToCameraRollButton from "@/components/SaveToCameraRollButton";
-import { getIndividualName } from "@/lib/individualNames";
+import type { PhotoTile } from "@/lib/types";
 
 /**
  * This week's highlights for a single connection, the shareable card behind
@@ -41,8 +41,15 @@ function pct(value: number, extent: number): string {
   return `${(value / extent) * 100}%`;
 }
 
-export default function IndividualHighlightsCard({ id }: { id: string }) {
-  const otherName = getIndividualName(id);
+export default function IndividualHighlightsCard({
+  id,
+  otherName,
+  photos,
+}: {
+  id: string;
+  otherName: string;
+  photos: PhotoTile[];
+}) {
   /** The passport itself — the cloth, the card and the yarn — is what gets saved. */
   const passportRef = useRef<HTMLDivElement | null>(null);
 
@@ -79,7 +86,7 @@ export default function IndividualHighlightsCard({ id }: { id: string }) {
             }}
           >
             <div className="absolute inset-x-0" style={{ top: pct(-CARD_CROP_TOP, CARD_H) }}>
-              <IndividualGraph otherName={otherName} variant="highlights" />
+              <IndividualGraph otherName={otherName} photos={photos} variant="highlights" />
             </div>
           </div>
 

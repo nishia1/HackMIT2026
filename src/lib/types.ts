@@ -28,6 +28,28 @@ export type Stamp = {
   caption: string | null;
 };
 
+/**
+ * One loop on the circle's endless string.
+ *
+ * The ribbon draws more loops than you have connections, so it cycles through
+ * the list (`loops[i % loops.length]`). That is why a loop is identified by
+ * `personId` and never by its position: the same person comes round again
+ * further down the scroll, and both appearances have to be the same person —
+ * for the link, and for the fading popup's "already shown this one" check.
+ */
+export type Loop = {
+  personId: string;
+  name: string;
+};
+
+/** One photo, ready to drop straight onto a filler box. */
+export type PhotoTile = {
+  /** Points at our own /api/photo, which proxies and transcodes on demand. */
+  src: string;
+  /** The caption if there is one, else the event's title. */
+  alt: string;
+};
+
 /** Dev 3 → everyone. The shape the whole UI renders. */
 export type StringView = {
   personId: string;

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { type ViewMode } from "@/components/GroupIndividualToggle";
-import { getIndividualName } from "@/lib/individualNames";
 import { DEFAULT_GROUP_CHAT_NAME, getGroupChatName } from "@/lib/groupChatNames";
+import type { Loop } from "@/lib/types";
 import MainStringSegment, { type MainStringSegmentHandle } from "./MainStringSegment";
 import {
   FLIPPED_LABELS,
@@ -61,7 +61,13 @@ function displayedColors(i: number) {
   };
 }
 
-export default function InfiniteMainString({ mode }: { mode: ViewMode }) {
+export default function InfiniteMainString({
+  mode,
+  loops,
+}: {
+  mode: ViewMode;
+  loops: Loop[];
+}) {
   const [segmentCount, setSegmentCount] = useState(INITIAL_SEGMENTS);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -184,6 +190,7 @@ export default function InfiniteMainString({ mode }: { mode: ViewMode }) {
             key={i}
             index={i}
             mode={mode}
+            loops={loops}
             tileRef={(el) => {
               if (el) tileRefs.current.set(i, el);
               else tileRefs.current.delete(i);
@@ -251,11 +258,13 @@ function GridBackground({ segmentCount }: { segmentCount: number }) {
 function StringTile({
   index,
   mode,
+  loops,
   tileRef,
   segmentRef,
 }: {
   index: number;
   mode: ViewMode;
+  loops: Loop[];
   tileRef: (el: HTMLDivElement | null) => void;
   segmentRef: (handle: MainStringSegmentHandle | null) => void;
 }) {
@@ -289,20 +298,46 @@ function StringTile({
       />
 
       {labels.map((label, i) => {
-        const labelId = `main-${index}-${i}`;
+        const groupChatId = `main-${index}-${i}`;
+        /**
+         * The ribbon draws far more loops than you have connections, so the
+         * list cycles. Keyed off the loop's position in the whole scroll, not
+         * within this tile, so the sequence runs on across tiles instead of
+         * restarting at every one.
+         */
+        const person = loops.length > 0 ? loops[(index * labels.length + i) % loops.length] : null;
+
+        const placement = {
+          left: `${label.left}%`,
+          top: `${label.top}%`,
+          width: `${label.width}%`,
+          transform: "translate(-50%, -50%)",
+        };
+        const className =
+          "absolute break-words text-center font-mono font-bold text-[16px] leading-[1.2] text-[#c40505]";
+
+        // A new account has no connections. The ribbon still draws — there is
+        // just nothing to name, and nowhere for the label to go.
+        if (mode === "individual" && !person) {
+          return (
+            <span key={i} className={`${className} opacity-40`} style={placement}>
+              &mdash;
+            </span>
+          );
+        }
+
         return (
           <Link
             key={i}
-            href={mode === "individual" ? `/individual/${labelId}` : `/group-chat/${labelId}`}
-            className="absolute break-words text-center font-mono font-bold text-[16px] leading-[1.2] text-[#c40505] hover:underline"
-            style={{
-              left: `${label.left}%`,
-              top: `${label.top}%`,
-              width: `${label.width}%`,
-              transform: "translate(-50%, -50%)",
-            }}
+            href={mode === "individual" ? `/individual/${person!.personId}` : `/group-chat/${groupChatId}`}
+            className={`${className} hover:underline`}
+            style={placement}
           >
-            <ConnectionLabelText id={labelId} mode={mode} />
+            {mode === "individual" ? (
+              person!.name
+            ) : (
+              <GroupChatLabelText id={groupChatId} />
+            )}
           </Link>
         );
       })}
@@ -311,21 +346,20 @@ function StringTile({
 }
 
 /**
- * In "group" mode, renders the chat's current name, defaulting to "NEW GROUP
- * CHAT" until the user renames it on the chat page (see groupChatNames.ts).
- * Starts at the default on the server/first client render and swaps to the
- * stored name after mount — localStorage isn't available during SSR, and
- * reading it before mount would mismatch the server-rendered markup.
+ * A group chat's current name, defaulting to "NEW GROUP CHAT" until the user
+ * renames it on the chat page (see groupChatNames.ts). Starts at the default
+ * on the server/first client render and swaps to the stored name after mount
+ * — localStorage isn't available during SSR, and reading it before mount
+ * would mismatch the server-rendered markup.
  *
- * In "individual" mode, renders a filler name standing in for the specific
- * person that connection is with (see individualNames.ts) — no per-loop
- * rename support for these yet, so there's nothing to read from storage.
+ * Individual labels need none of this: they are real people, named by the
+ * server, so they render straight from their loop.
  */
-function ConnectionLabelText({ id, mode }: { id: string; mode: ViewMode }) {
+function GroupChatLabelText({ id }: { id: string }) {
   const [name, setName] = useState(DEFAULT_GROUP_CHAT_NAME);
   useEffect(() => {
     setName(getGroupChatName(id));
   }, [id]);
-  return <>{mode === "individual" ? getIndividualName(id) : name}</>;
+  return <>{name}</>;
 }
 
