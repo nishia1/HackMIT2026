@@ -6,7 +6,8 @@ const EMPTY_PROFILE: UserDoc["profile"] = {
   interests: [],
   budget: "cheap",
   city: null,
-  freeEvenings: [],
+  freeWindows: [],
+  connectedApps: {},
 };
 
 /** Opaque and short. Ids end up in URLs, so an email would leak one. */
