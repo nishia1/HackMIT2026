@@ -1,6 +1,5 @@
 import { getDb } from "@/server/db/client";
-import { COLLECTIONS, type FriendshipDoc } from "@/server/db/schema";
-import { demoWorld } from "./memory-store";
+import { COLLECTIONS, friendPair, type FriendshipDoc } from "@/server/db/schema";
 
 /**
  * Discovery walks the whole friendship graph, and at demo scale the whole
@@ -9,10 +8,26 @@ import { demoWorld } from "./memory-store";
  */
 export async function allPairs(): Promise<[string, string][]> {
   const db = await getDb();
-  const docs = db
-    ? await db.collection<FriendshipDoc>(COLLECTIONS.friendships).find({}).toArray()
-    : demoWorld().friendships;
+  const docs = await db
+    .collection<FriendshipDoc>(COLLECTIONS.friendships)
+    .find({})
+    .toArray();
   return docs.map((f) => f.pair);
+}
+
+/**
+ * Idempotent by construction: `pair` is sorted and used as the id, so linking
+ * two people who are already linked is a no-op rather than a second row.
+ */
+export async function link(aId: string, bId: string): Promise<void> {
+  if (aId === bId) return;
+  const db = await getDb();
+  const pair = friendPair(aId, bId);
+  await db.collection<FriendshipDoc>(COLLECTIONS.friendships).updateOne(
+    { _id: pair.join("__") },
+    { $setOnInsert: { pair, createdAt: new Date().toISOString() } },
+    { upsert: true },
+  );
 }
 
 export async function friendIdsOf(userId: string): Promise<string[]> {

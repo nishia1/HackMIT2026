@@ -10,13 +10,20 @@ export type Tier = "alive" | "warm" | "fading" | "cold";
 
 export type Budget = "free" | "cheap" | "mid" | "splurge";
 
-/** One memory, flattened for rendering. Dev 2 produces these. */
+/**
+ * One outing — not one photo. A cluster of photos with nearby timestamps is a
+ * single event, and a single event is a single stamp on the string. See
+ * `stampsOf`.
+ */
 export type Stamp = {
   eventId: string;
   title: string; // "Ramen at 2am"
-  emoji: string;
-  kind: string; // "food" | "hike" | "concert" | …
+  emoji: string; // derived from `kind`, never chosen by hand
+  kind: string; // "dinner" | "hike" | "concert" | …
   happenedAt: string; // ISO
+  /** How many photos are behind this stamp. */
+  photoCount: number;
+  /** The cover, resolved at read time. Null when the event has no photos. */
   photoUrl: string | null;
   caption: string | null;
 };

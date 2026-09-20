@@ -18,12 +18,25 @@ export const COLLECTIONS = {
 
 export type UserDoc = {
   _id: string;
-  email: string;
+  /**
+   * Null for someone who was tagged before they ever signed in. With an email
+   * the account is claimed on their first sign-in; without one they are a name
+   * on a string and nothing more, which is still a real person in the graph.
+   */
+  email: string | null;
   name: string;
   avatarUrl: string | null;
   profile: Profile;
   google?: { refreshToken: string };
-  dropbox?: { accessToken: string; refreshToken: string; accountId: string };
+  dropbox?: {
+    accessToken: string;
+    /** Expiry of `accessToken`, ISO. Dropbox access tokens last four hours. */
+    expiresAt: string;
+    refreshToken: string;
+    accountId: string;
+    /** Which folder to scan. Chosen by the user after connecting. */
+    folder: string | null;
+  };
 };
 
 /** Undirected: `pair` is always sorted, so a friendship has one row, not two. */
@@ -48,4 +61,13 @@ export const friendPair = (a: string, b: string): [string, string] =>
 export async function ensureIndexes(db: Db) {
   await db.collection(COLLECTIONS.events).createIndex({ attendeeIds: 1, happenedAt: -1 });
   await db.collection(COLLECTIONS.friendships).createIndex({ pair: 1 });
+  // Sign-in looks a user up by email, and two accounts sharing one email would
+  // mean the wrong person claims the string. Partial, because a tagged contact
+  // may have no email at all and several nulls are not a conflict.
+  await db
+    .collection(COLLECTIONS.users)
+    .createIndex(
+      { email: 1 },
+      { unique: true, partialFilterExpression: { email: { $type: "string" } } },
+    );
 }

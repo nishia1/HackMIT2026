@@ -1,35 +1,42 @@
-// import { auth, signIn } from "@/auth";
-import Link from "next/link";
+import { redirect } from "next/navigation";
+import { signIn } from "@/auth";
+import { optionalUserId } from "@/server/services/session";
+
+export const dynamic = "force-dynamic";
 
 /**
- * Google auth is disabled for now (see src/auth.ts) — nothing here to sign
- * in with. Nothing links here anymore either (page.tsx goes straight to
- * /circle), so this only matters if someone navigates here directly.
+ * The front door. One button, because the app has exactly one thing to ask —
+ * where your photos are — and the same consent answers who you are.
  */
-export default function SignInPage() {
+export default async function SignIn() {
+  if (await optionalUserId()) redirect("/import");
+
   return (
-    <main className="space-y-6 pt-16">
-      <header>
-        <h1 className="font-display text-4xl">Invisible String</h1>
-        <p className="mt-3 text-inkSoft">
-          Sign-in is switched off for now. Everything works without an account.
-        </p>
-      </header>
-      {/*
+    <div className="flex min-h-[70vh] flex-col justify-center">
+      <h1 className="font-display text-4xl leading-tight">Invisible String</h1>
+      <p className="mt-3 text-inkSoft">
+        There are more connections around you than you can see. Point us at your
+        camera roll and we will show you the ones you already have.
+      </p>
+
       <form
         action={async () => {
           "use server";
-          await signIn("google", { redirectTo: "/profile" });
+          await signIn("dropbox", { redirectTo: "/import" });
         }}
       >
-        <button className="w-full rounded-md bg-ink px-4 py-3 text-paper" type="submit">
-          Sign in with Google
+        <button
+          type="submit"
+          className="mt-8 w-full rounded-md bg-string px-4 py-3 text-paper"
+        >
+          Continue with Dropbox
         </button>
       </form>
-      */}
-      <Link href="/profile" className="inline-block rounded-md bg-ink px-4 py-3 text-paper">
-        Go to profile
-      </Link>
-    </main>
+
+      <p className="mt-4 text-sm text-inkSoft">
+        We read the dates on your photos, never the files themselves, and nothing is
+        ever written back to your Dropbox.
+      </p>
+    </div>
   );
 }

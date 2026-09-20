@@ -2,6 +2,8 @@ import * as events from "@/server/repo/events";
 import * as friends from "@/server/repo/friends";
 import * as users from "@/server/repo/users";
 import { adjacencyOf, discover } from "@/server/domain/discover";
+import { emojiFor } from "@/server/domain/label";
+import { photoUrl } from "@/lib/photo";
 import { daysBetween, strengthOf } from "@/server/domain/strength";
 import { deservesNudge, losing, tierOf } from "@/server/domain/tiers";
 import type { Discovery, EventDoc, Nudge, Stamp, StringView } from "@/lib/types";
@@ -14,29 +16,38 @@ import type { Discovery, EventDoc, Nudge, Stamp, StringView } from "@/lib/types"
  * whatever `now` you hand it.
  */
 
+/**
+ * One stamp per event — not per photo.
+ *
+ * A stamp is the thing that happened. A weekend away is two hundred photos and
+ * one stamp; mapping each memory to its own turned a string's history into two
+ * hundred near-identical rows, which is a list of files rather than a record of
+ * a friendship.
+ *
+ * The cover comes from the first memory with a path. `thumbUrl` is never set
+ * on purpose — a stored Dropbox link is a broken image in four hours — so the
+ * URL is minted from the path at read time, like every other photo here.
+ */
 export function stampsOf(event: EventDoc): Stamp[] {
-  if (event.memories.length === 0) {
-    return [
-      {
-        eventId: event._id,
-        title: event.title,
-        emoji: "🧵",
-        kind: event.kind,
-        happenedAt: event.happenedAt,
-        photoUrl: null,
-        caption: null,
-      },
-    ];
-  }
-  return event.memories.map((m, i) => ({
-    eventId: `${event._id}:${i}`,
-    title: m.stampTitle || event.title,
-    emoji: m.stampEmoji || "🧵",
-    kind: event.kind,
-    happenedAt: event.happenedAt,
-    photoUrl: m.thumbUrl,
-    caption: m.caption,
-  }));
+  const withPhoto = event.memories.find((m) => m.dropboxPath);
+  const captioned = event.memories.find((m) => m.caption);
+
+  return [
+    {
+      eventId: event._id,
+      title: event.title,
+      emoji: emojiFor(event.kind),
+      kind: event.kind,
+      happenedAt: event.happenedAt,
+      photoCount: event.memories.filter((m) => m.dropboxPath).length,
+      photoUrl: withPhoto?.dropboxPath
+        ? photoUrl(withPhoto.dropboxPath, withPhoto.addedBy)
+        : null,
+      // Whatever the person actually wrote about this outing, if anything. One
+      // line of theirs beats a generated title.
+      caption: captioned?.caption ?? null,
+    },
+  ];
 }
 
 /** Every event you were at, bucketed by who else was there. */

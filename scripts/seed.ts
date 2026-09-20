@@ -36,6 +36,20 @@ async function main() {
     await client.connect();
     const db = client.db(process.env.MONGODB_DB ?? "invisible-string");
 
+    // Every collection is about to be emptied, and since sign-in landed those
+    // collections hold real accounts and the Dropbox grants attached to them.
+    // Losing a seeded world is nothing; losing those means every user
+    // reconnects. So this asks to be meant.
+    const users = await db.collection(COLLECTIONS.users).countDocuments();
+    if (users > 0 && !process.argv.includes("--force")) {
+      console.error(
+        `Refusing to seed: ${users} user${users === 1 ? "" : "s"} already exist in ` +
+          `"${db.databaseName}". This deletes all of them, along with their Dropbox ` +
+          `connections. Re-run with --force if that is really what you want.`,
+      );
+      process.exit(1);
+    }
+
     for (const name of Object.values(COLLECTIONS)) {
       await db.collection(name).deleteMany({});
     }

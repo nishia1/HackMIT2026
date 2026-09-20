@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { planMeetup } from "@/server/services/planner";
 import { MOCK_ME_ID, MOCK_PEOPLE, MOCK_STAMPS, getMockProfile } from "@/data/mock";
-import { auth } from "@/auth";
 import { getDb } from "@/server/db/client";
-import { calendarTokenFor } from "@/server/external/google-auth";
+import { requireUserId } from "@/server/services/session";
+import { findById } from "@/server/repo/users";
 import type { Profile } from "@/lib/types";
 
 /**
@@ -46,31 +46,29 @@ export async function POST(req: Request) {
   const person = MOCK_PEOPLE[personId];
   if (!person) return NextResponse.json({ error: "no such person" }, { status: 404 });
 
-  // Auth is disabled for now (see src/auth.ts), so `session` is always null —
-  // this always falls through to the mock profile below. `getDb()` returning
-  // null (Mongo unset or unreachable) just means no one gets a real calendar,
-  // same as being signed out.
-  const session = await auth();
-  const email = session?.user?.email ?? null;
-  const db = await getDb().catch(() => null);
-  const currentUser = email && db ? await db.collection("users").findOne({ email }) : null;
-  const meProfile = (currentUser?.profile as Profile | undefined) ?? getMockProfile(MOCK_ME_ID);
-  const myCalendarToken = email && db ? await calendarTokenFor(email) : null;
+  // Your real profile, keyed on the signed-in user. Falls back to the mock
+  // one only when you haven't filled yours in yet.
+  const currentUser = await findById(await requireUserId());
+  const meProfile = currentUser?.profile ?? getMockProfile(MOCK_ME_ID);
 
+  // No calendars: Google auth was removed, so nobody has a token and
+  // `planner` skips the free/busy lookup entirely (see planner.ts:136).
   const me = {
-    name: session?.user?.name ?? "You",
+    name: currentUser?.name ?? "You",
     profile: meProfile,
-    accessToken: myCalendarToken,
+    accessToken: null,
   };
-  const theirUser =
-    theirEmail && db ? await db.collection("users").findOne({ email: theirEmail }) : null;
-  const theirCalendarToken = theirEmail && db ? await calendarTokenFor(theirEmail) : null;
+
+  const db = await getDb();
+  const theirUser = theirEmail
+    ? await db.collection("users").findOne({ email: theirEmail })
+    : null;
 
   const them = {
     personId,
     name: theirUser?.name ?? person.name,
     profile: (theirUser?.profile as Profile | undefined) ?? getMockProfile(personId),
-    accessToken: theirCalendarToken,
+    accessToken: null,
   };
   const stamps = MOCK_STAMPS[personId] ?? [];
   // ---- END SEAM --------------------------------------------------------
@@ -83,7 +81,9 @@ export async function POST(req: Request) {
     ...result,
     // Whether each side's real calendar was actually used, so testing two
     // real Google accounts doesn't require reading server logs to confirm.
-    calendars: { me: Boolean(myCalendarToken), them: Boolean(theirCalendarToken) },
+    // Always false now that Google auth is gone. Kept so the client contract
+    // does not change if calendars ever come back.
+    calendars: { me: false, them: false },
     // Send the stamps back so the client can render "because …" without a
     // second round trip.
     stamps: stamps.map((s) => ({ eventId: s.eventId, title: s.title, emoji: s.emoji })),

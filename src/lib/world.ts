@@ -5,9 +5,10 @@ import {
   getString,
   getStrings,
 } from "@/server/services/strings";
-import { currentUserId } from "@/server/services/session";
+import { requireUserId } from "@/server/services/session";
 import type { Discovery, Nudge, StringView } from "@/lib/types";
-import { findAll } from "@/server/repo/users";
+import { findManyByIds } from "@/server/repo/users";
+import { friendIdsOf } from "@/server/repo/friends";
 
 /**
  * THE SEAM
@@ -28,7 +29,7 @@ export type Circle = {
 
 export async function loadCircle(nowParam?: string | null): Promise<Circle> {
   const now = parseNow(nowParam);
-  const meId = currentUserId();
+  const meId = await requireUserId();
   const [strings, nudges] = await Promise.all([
     getStrings(meId, now),
     getNudges(meId, now),
@@ -40,21 +41,24 @@ export async function loadString(
   personId: string,
   nowParam?: string | null,
 ): Promise<StringView | null> {
-  return getString(currentUserId(), personId, parseNow(nowParam));
+  return getString(await requireUserId(), personId, parseNow(nowParam));
 }
 
 export async function loadDiscoveries(limit = 12): Promise<Discovery[]> {
-  return getDiscoveries(currentUserId(), limit);
+  return getDiscoveries(await requireUserId(), limit);
 }
 
 /**
- * Everyone available to tag as an attendee when importing an event.
- * Excludes you — you were obviously there, no need to tag yourself.
+ * Everyone available to tag as an attendee when importing an event: the people
+ * you are connected to, and nobody else. Excludes you — you were obviously
+ * there, no need to tag yourself.
+ *
+ * A brand new account has none, which is why the tag screen can add one.
  */
 export async function getPeople(): Promise<{ id: string; name: string; emoji: string | null }[]> {
-  const me = currentUserId();
-  const users = await findAll();
-  return users
+  const me = await requireUserId();
+  const users = await findManyByIds(await friendIdsOf(me));
+  return [...users.values()]
     .filter((u) => u._id !== me)
     .map((u) => ({ id: u._id, name: u.name, emoji: u.avatarUrl }));
 }

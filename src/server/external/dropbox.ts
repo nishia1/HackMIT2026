@@ -1,9 +1,14 @@
 import type { PhotoMeta } from "@/server/domain/cluster";
+import { findById, setDropboxToken } from "@/server/repo/users";
 
 /**
  * Dropbox, kept deliberately thin: list metadata, and turn a handful of paths
  * into links the vision model can read. Nothing here ever writes to the user's
  * Dropbox — the import path is read-only by construction.
+ *
+ * Every entry point takes a userId. There is no app-wide Dropbox connection:
+ * the credentials belong to the person who granted them, and are read from
+ * their own user document.
  */
 
 const API = "https://api.dropboxapi.com/2";
@@ -21,33 +26,54 @@ type ListEntry = {
 
 type ListResponse = { entries: ListEntry[]; cursor: string; has_more: boolean };
 
-/**
- * Access tokens last four hours, which is shorter than a hackathon. A refresh
- * token plus the app key and secret buys a fresh one on demand; the cached
- * token is kept in module scope so a burst of requests does one exchange.
- */
-let cached: { token: string; expiresAt: number } | null = null;
-
-export async function accessToken(): Promise<string> {
-  const direct = process.env.DROPBOX_ACCESS_TOKEN;
-  if (direct) return direct;
-
-  const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
+/** The app's own identity. Not a user's — these grant nothing on their own. */
+function appCredentials(): { key: string; secret: string } {
   const key = process.env.DROPBOX_APP_KEY;
   const secret = process.env.DROPBOX_APP_SECRET;
-  if (!refreshToken || !key || !secret) {
-    throw new Error("Dropbox is not configured");
+  if (!key || !secret) {
+    throw new Error("Dropbox is not set up — DROPBOX_APP_KEY and DROPBOX_APP_SECRET are missing");
   }
+  return { key, secret };
+}
 
-  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
+const basicAuth = () => {
+  const { key, secret } = appCredentials();
+  return `Basic ${Buffer.from(`${key}:${secret}`).toString("base64")}`;
+};
+
+/**
+ * Access tokens last four hours; refresh tokens do not expire. Tokens are
+ * cached per user — a single map shared by every user would hand one person's
+ * Dropbox to the next request on the same serverless instance.
+ */
+const cache = new Map<string, { token: string; expiresAt: number }>();
+
+const FRESH_ENOUGH = 60_000;
+
+export async function accessToken(userId: string): Promise<string> {
+  const hit = cache.get(userId);
+  if (hit && hit.expiresAt > Date.now() + FRESH_ENOUGH) return hit.token;
+
+  const user = await findById(userId);
+  const dropbox = user?.dropbox;
+  if (!dropbox) throw new Error("Dropbox is not connected");
+
+  const storedExpiry = Date.parse(dropbox.expiresAt);
+  if (Number.isFinite(storedExpiry) && storedExpiry > Date.now() + FRESH_ENOUGH) {
+    cache.set(userId, { token: dropbox.accessToken, expiresAt: storedExpiry });
+    return dropbox.accessToken;
+  }
 
   const res = await fetch(OAUTH, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${key}:${secret}`).toString("base64")}`,
+      Authorization: basicAuth(),
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: dropbox.refreshToken,
+    }),
   });
   if (!res.ok) {
     throw new Error(`Dropbox token refresh failed (${res.status}): ${await res.text()}`);
@@ -57,17 +83,23 @@ export async function accessToken(): Promise<string> {
     access_token: string;
     expires_in: number;
   };
-  cached = { token: access_token, expiresAt: Date.now() + expires_in * 1000 };
+  const expiresAt = Date.now() + expires_in * 1000;
+
+  cache.set(userId, { token: access_token, expiresAt });
+  // Written back so a cold instance starts from a live token rather than
+  // spending a round trip rediscovering one.
+  await setDropboxToken(userId, {
+    accessToken: access_token,
+    expiresAt: new Date(expiresAt).toISOString(),
+  });
+
   return access_token;
 }
 
-export function isConfigured(): boolean {
-  return Boolean(
-    process.env.DROPBOX_ACCESS_TOKEN ||
-      (process.env.DROPBOX_REFRESH_TOKEN &&
-        process.env.DROPBOX_APP_KEY &&
-        process.env.DROPBOX_APP_SECRET),
-  );
+/** Has this particular person connected their Dropbox? */
+export async function isConnected(userId: string): Promise<boolean> {
+  const user = await findById(userId);
+  return Boolean(user?.dropbox?.refreshToken);
 }
 
 async function call<T>(token: string, endpoint: string, body: unknown): Promise<T> {
@@ -112,6 +144,37 @@ export async function listFolder(
   }
 
   return photos;
+}
+
+/**
+ * The folders directly inside `parent`, for the picker. Nobody's camera roll
+ * is reliably at /Camera Uploads — it depends on which app synced it — so the
+ * user tells us, once, and we remember.
+ */
+export async function listFolders(
+  token: string,
+  parent = "",
+): Promise<{ name: string; path: string }[]> {
+  const folders: { name: string; path: string }[] = [];
+  let page = await call<ListResponse>(token, "/files/list_folder", {
+    path: parent,
+    recursive: false,
+    limit: 1000,
+  });
+
+  for (;;) {
+    for (const entry of page.entries) {
+      if (entry[".tag"] === "folder" && entry.path_lower) {
+        folders.push({ name: entry.name, path: entry.path_lower });
+      }
+    }
+    if (!page.has_more) break;
+    page = await call<ListResponse>(token, "/files/list_folder/continue", {
+      cursor: page.cursor,
+    });
+  }
+
+  return folders.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Temporary links expire after four hours, so callers must not store them. */

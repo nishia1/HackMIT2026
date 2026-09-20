@@ -5,12 +5,9 @@ import { MongoClient, type Db } from "mongodb";
  * because Next re-evaluates modules on every edit and Atlas M0 allows 500
  * connections, not 5,000.
  *
- * Two different callers need this in two different shapes:
- *  - @auth/mongodb-adapter wants a raw Promise<MongoClient> (mongoClientPromise).
- *  - The repo layer wants a resolved Db, or null if no MONGODB_URI is set,
- *    so `npm run dev` still works on a fresh clone against the seeded demo
- *    world in memory.
- * Both share the same cached connection below rather than opening two.
+ * There is no in-memory fallback. Every read is a real user's real data, and
+ * a missing MONGODB_URI used to mean the app quietly served someone else's
+ * seeded history instead of saying so.
  */
 
 const globalForMongo = globalThis as typeof globalThis & {
@@ -21,10 +18,10 @@ export function isDbConfigured() {
   return Boolean(process.env.MONGODB_URI);
 }
 
-function connect(): Promise<MongoClient> {
+export async function getDb(): Promise<Db> {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
-    throw new Error("MONGODB_URI is not set");
+    throw new Error("No MONGODB_URI — set one in .env.local, or in the Vercel project settings.");
   }
 
   globalForMongo.__mongo ??= new MongoClient(uri, {
@@ -42,34 +39,7 @@ function connect(): Promise<MongoClient> {
       throw new Error(explain(err));
     });
 
-  return globalForMongo.__mongo;
-}
-
-/**
- * Undefined when MONGODB_URI isn't set, so importing this module never
- * crashes pages that don't touch the database (e.g. sign-in without an
- * adapter configured yet). Callers that need the database should call
- * requireMongoClientPromise() to get a clear error at the point of use.
- * This is the shape @auth/mongodb-adapter expects for its clientPromise option.
- */
-export const mongoClientPromise = isDbConfigured() ? connect() : undefined;
-
-export function requireMongoClientPromise() {
-  if (!mongoClientPromise) {
-    throw new Error("MONGODB_URI is not set");
-  }
-  return mongoClientPromise;
-}
-
-export async function getDb(): Promise<Db | null> {
-  if (!isDbConfigured()) return null;
-  const client = await connect();
-  return client.db(process.env.MONGODB_DB ?? "invisible-string");
-}
-
-/** Back-compat alias for callers still using the old name. */
-export async function appDb() {
-  const client = await requireMongoClientPromise();
+  const client = await globalForMongo.__mongo;
   return client.db(process.env.MONGODB_DB ?? "invisible-string");
 }
 

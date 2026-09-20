@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Budget, Profile } from "@/lib/types";
-import { getDb } from "@/server/db/client";
+import { findById, setProfile } from "@/server/repo/users";
+import { withUser } from "@/server/services/respond";
 
 /**
  * GET  /api/profile  →  Profile
@@ -10,23 +11,19 @@ import { getDb } from "@/server/db/client";
  * trusting the client: a bad budget string would silently widen someone's
  * spending ceiling, which is the one thing the matcher must never get wrong.
  *
- * Auth is disabled for now (see src/auth.ts), so there's no session to key
- * on — everyone reads/writes the one demo profile below. `getDb()` returning
- * null (Mongo unset or unreachable) falls back to an in-memory copy instead
- * of 500ing, same idea as the rest of the app's demo-world fallback.
+ * Keyed on the signed-in user. There is no shared demo profile and no
+ * in-memory fallback: a profile belongs to one person, and quietly handing
+ * someone else's back — or losing an edit on restart — is worse than an error.
  */
 
 const BUDGETS: Budget[] = ["free", "cheap", "mid", "splurge"];
 const EMPTY: Profile = { interests: [], budget: "cheap", city: null, freeEvenings: [] };
-const DEMO_EMAIL = "you@example.com";
-
-let memoryProfile: Profile | null = null;
 
 export async function GET() {
-  const db = await getDb().catch(() => null);
-  if (!db) return NextResponse.json(memoryProfile ?? EMPTY);
-  const user = await db.collection("users").findOne({ email: DEMO_EMAIL });
-  return NextResponse.json((user?.profile as Profile | undefined) ?? EMPTY);
+  return withUser(async (userId) => {
+    const user = await findById(userId);
+    return user?.profile ?? EMPTY;
+  });
 }
 
 export async function PUT(req: Request) {
@@ -40,16 +37,12 @@ export async function PUT(req: Request) {
   const parsed = parseProfile(body);
   if ("error" in parsed) return NextResponse.json(parsed, { status: 400 });
 
-  const db = await getDb().catch(() => null);
-  if (!db) {
-    memoryProfile = parsed.profile;
-    return NextResponse.json(parsed.profile);
-  }
-
-  await db
-    .collection("users")
-    .updateOne({ email: DEMO_EMAIL }, { $set: { profile: parsed.profile } }, { upsert: true });
-  return NextResponse.json(parsed.profile);
+  return withUser(async (userId) => {
+    // Scoped to the signed-in user, not a shared demo row — two people filling
+    // in their interests must not overwrite each other.
+    await setProfile(userId, parsed.profile);
+    return parsed.profile;
+  });
 }
 
 function parseProfile(input: unknown): { profile: Profile } | { error: string } {

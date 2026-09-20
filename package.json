@@ -12,12 +12,9 @@
     "verify": "tsx scripts/verify-demo.ts",
     "verify:import": "tsx scripts/verify-import.ts",
     "verify:db": "tsx --env-file-if-exists=.env.local scripts/verify-db.ts",
-    "dropbox:auth": "tsx --env-file-if-exists=.env.local scripts/dropbox-authorize.ts",
-    "check:calendar": "tsx --env-file=.env.local scripts/check-calendar.ts",
     "peek:db": "tsx --env-file=.env.local scripts/peek-db.ts"
   },
   "dependencies": {
-    "@auth/mongodb-adapter": "^3.11.3",
     "mongodb": "^6.21.0",
     "next": "^15.0.3",
     "next-auth": "^5.0.0-beta.32",

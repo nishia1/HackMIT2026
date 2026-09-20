@@ -1,6 +1,8 @@
 import ImportView from "@/app/import/ImportView";
 import { getPeople } from "@/lib/world";
 import { recentCompanions } from "@/server/services/events";
+import { requireUserId } from "@/server/services/session";
+import { findById } from "@/server/repo/users";
 
 export const dynamic = "force-dynamic";
 
@@ -9,13 +11,21 @@ export const dynamic = "force-dynamic";
  * recently first. Tagging is the one manual step in the import, so the chip
  * you want should already be under your thumb.
  */
-export default async function ImportPage() {
-  const people = await getPeople();
+export default async function ImportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const meId = await requireUserId();
+  const [me, people, { error }] = await Promise.all([
+    findById(meId),
+    getPeople(),
+    searchParams,
+  ]);
 
-  // No database, or a cold one, just means we keep the world's own order —
-  // which is already sorted by how strong the string is, so it is a decent
-  // second guess at who you were with.
-  const recent = await recentCompanions().catch(() => [] as string[]);
+  // No history yet just means we keep the order we were given — there is
+  // nothing to learn from until the first import lands.
+  const recent = await recentCompanions(meId).catch(() => [] as string[]);
   const rank = new Map(recent.map((id, i) => [id, i]));
   const original = new Map(people.map((p, i) => [p.id, i]));
 
@@ -26,5 +36,12 @@ export default async function ImportPage() {
     return original.get(a.id)! - original.get(b.id)!;
   });
 
-  return <ImportView people={ordered} />;
+  return (
+    <ImportView
+      people={ordered}
+      me={{ name: me?.name ?? "You" }}
+      connection={{ folder: me?.dropbox?.folder ?? null }}
+      initialError={error ?? null}
+    />
+  );
 }

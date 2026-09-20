@@ -39,13 +39,29 @@ export default async function CardPage({
             {string.stamps.map((stamp) => (
               <li
                 key={stamp.eventId}
-                className="flex gap-3 border-t border-ink/10 pt-3"
+                className="flex items-start gap-3 border-t border-ink/10 pt-3"
               >
-                <span className="text-2xl">{stamp.emoji}</span>
+                {stamp.photoUrl ? (
+                  // The cover. Not next/image: proxied bytes, not a known-size asset.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={stamp.photoUrl}
+                    alt=""
+                    loading="lazy"
+                    className="h-12 w-12 shrink-0 rounded-md border border-ink/15 object-cover"
+                  />
+                ) : (
+                  <span className="w-12 shrink-0 text-center text-2xl">{stamp.emoji}</span>
+                )}
                 <span className="flex-1">
-                  <span className="font-display">{stamp.title}</span>
+                  <span className="font-display">
+                    {stamp.emoji} {stamp.title}
+                  </span>
                   <span className="block text-sm text-inkSoft">
                     {stamp.happenedAt.slice(0, 10)} · {stamp.kind}
+                    {stamp.photoCount > 0 && (
+                      <> · {stamp.photoCount === 1 ? "1 photo" : `${stamp.photoCount} photos`}</>
+                    )}
                   </span>
                   {stamp.caption && <span className="block">{stamp.caption}</span>}
                 </span>
