@@ -78,6 +78,22 @@ export default function ImportView({ people }: { people: Person[] }) {
       };
     });
 
+  /**
+   * Copy this event's people onto every later one that is still untagged. A
+   * weekend away is six candidates and one set of friends; without this it is
+   * also six rounds of the same taps.
+   */
+  function applyToRest(fromId: string) {
+    const people = tags[fromId] ?? [];
+    const candidates = result?.candidates ?? [];
+    const after = candidates.slice(candidates.findIndex((c) => c.id === fromId) + 1);
+    setTags((prev) => {
+      const next = { ...prev };
+      for (const c of after) if (!(next[c.id] ?? []).length) next[c.id] = [...people];
+      return next;
+    });
+  }
+
   const tagged = (result?.candidates ?? []).filter((c) => (tags[c.id] ?? []).length > 0);
 
   async function confirm() {
@@ -189,6 +205,15 @@ export default function ImportView({ people }: { people: Person[] }) {
                   selected={tags[c.id] ?? []}
                   onToggle={(personId) => toggle(c.id, personId)}
                 />
+                {(tags[c.id] ?? []).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => applyToRest(c.id)}
+                    className="mt-2 text-sm text-inkSoft underline"
+                  >
+                    Same people for the rest
+                  </button>
+                )}
               </li>
             ))}
           </ul>

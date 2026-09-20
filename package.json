@@ -10,6 +10,7 @@
     "check": "tsc --noEmit",
     "verify": "tsx scripts/verify-demo.ts",
     "verify:import": "tsx scripts/verify-import.ts",
+    "verify:db": "tsx --env-file-if-exists=.env.local scripts/verify-db.ts",
     "dropbox:auth": "tsx --env-file-if-exists=.env.local scripts/dropbox-authorize.ts"
   },
   "dependencies": {

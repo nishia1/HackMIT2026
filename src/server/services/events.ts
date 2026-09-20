@@ -57,17 +57,21 @@ export async function stampsFor(personId: string): Promise<StampView[]> {
   const events = await eventsWithPerson(personId);
 
   return events.flatMap((e) =>
-    e.memories.map(
-      (m): StampView => ({
-        eventId: e._id,
-        title: m.stampTitle,
-        emoji: m.stampEmoji,
-        kind: e.kind,
-        happenedAt: e.happenedAt,
-        caption: m.caption,
-        src: photoUrl(m.dropboxPath),
-      }),
-    ),
+    e.memories
+      // A memory with no path has no image — the seeded world is like this.
+      // Asking for it anyway would render a broken thumbnail.
+      .filter((m): m is Memory & { dropboxPath: string } => Boolean(m.dropboxPath))
+      .map(
+        (m): StampView => ({
+          eventId: e._id,
+          title: m.stampTitle,
+          emoji: m.stampEmoji,
+          kind: e.kind,
+          happenedAt: e.happenedAt,
+          caption: m.caption,
+          src: photoUrl(m.dropboxPath),
+        }),
+      ),
   );
 }
 

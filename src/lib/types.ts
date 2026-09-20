@@ -12,8 +12,12 @@ export type Memory = {
   /**
    * The durable handle. Dropbox paths outlive links, tokens and sessions, so
    * this — never a URL — is what gets written down.
+   *
+   * Null for a memory with no image behind it: the seeded demo world is all
+   * captions and stamp titles. Readers must skip those rather than ask for a
+   * photo that was never there.
    */
-  dropboxPath: string;
+  dropboxPath: string | null;
   caption: string | null;
   stampTitle: string;
   stampEmoji: string;
