@@ -11,7 +11,8 @@
     "seed": "tsx scripts/seed.ts",
     "verify": "tsx scripts/verify-demo.ts",
     "verify:import": "tsx scripts/verify-import.ts",
-    "dropbox:auth": "tsx scripts/dropbox-authorize.ts"
+    "verify:db": "tsx --env-file-if-exists=.env.local scripts/verify-db.ts",
+    "dropbox:auth": "tsx --env-file-if-exists=.env.local scripts/dropbox-authorize.ts"
   },
   "dependencies": {
     "mongodb": "^6.21.0",

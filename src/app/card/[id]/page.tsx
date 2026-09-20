@@ -1,5 +1,6 @@
 import Link from "next/link";
 import StringCard from "@/components/StringCard";
+import PhotoStrip from "@/components/PhotoStrip";
 import { loadString } from "@/lib/world";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,8 @@ export default async function CardPage({
           </ul>
         )}
       </section>
+
+      <PhotoStrip personId={id} />
     </div>
   );
 }

@@ -44,15 +44,34 @@ export type EventDoc = {
   createdBy: string;
   attendeeIds: string[]; // ← this array IS the string
   memories: Memory[];
+  /** Set by the camera-roll import. Absent on the seeded world. */
+  createdAt?: string;
 };
 
 export type Memory = {
+  /**
+   * The durable handle: paths outlive links, tokens and sessions. Null for a
+   * memory with no image behind it — the seeded world is captions only — so
+   * readers must skip those rather than ask for a photo that was never there.
+   */
   dropboxPath: string | null;
   thumbUrl: string | null;
   caption: string | null;
   stampTitle: string;
   stampEmoji: string;
   addedBy: string;
+};
+
+/** A memory dressed for display: a viewable src, resolved at read time. */
+export type StampView = {
+  eventId: string;
+  title: string;
+  emoji: string;
+  kind: string;
+  happenedAt: string;
+  caption: string | null;
+  /** Points at our own /api/photo, which proxies and transcodes on demand. */
+  src: string;
 };
 
 /** Dev 1 → Dev 2. Vision pass over 3 sample photos from a cluster. */

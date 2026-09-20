@@ -7,6 +7,7 @@ import type { PhotoMeta } from "@/server/domain/cluster";
  */
 
 const API = "https://api.dropboxapi.com/2";
+const CONTENT = "https://content.dropboxapi.com/2";
 const OAUTH = "https://api.dropboxapi.com/oauth2/token";
 
 const IMAGE = /\.(jpe?g|png|heic|heif|webp|gif)$/i;
@@ -122,4 +123,32 @@ export async function temporaryLink(token: string, path: string): Promise<string
 export async function temporaryLinks(token: string, paths: string[]): Promise<string[]> {
   const links = await Promise.allSettled(paths.map((p) => temporaryLink(token, p)));
   return links.flatMap((l) => (l.status === "fulfilled" ? [l.value] : []));
+}
+
+/**
+ * JPEG bytes, whatever the original was. This is the only way HEIC reaches a
+ * browser — Chrome and Firefox cannot decode it, and a phone camera roll is
+ * mostly HEIC. Dropbox does the transcode, so we never touch an image codec.
+ */
+export async function thumbnail(
+  token: string,
+  path: string,
+  size = "w640h480",
+): Promise<ArrayBuffer> {
+  const res = await fetch(`${CONTENT}/files/get_thumbnail_v2`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Dropbox-API-Arg": JSON.stringify({
+        resource: { ".tag": "path", path },
+        format: "jpeg",
+        size,
+        mode: "strict",
+      }),
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Dropbox thumbnail failed (${res.status}): ${await res.text()}`);
+  }
+  return res.arrayBuffer();
 }

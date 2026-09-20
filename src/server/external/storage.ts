@@ -1,4 +1,10 @@
-import { accessToken, isConfigured, listFolder, temporaryLinks } from "@/server/external/dropbox";
+import {
+  accessToken,
+  isConfigured,
+  listFolder,
+  temporaryLinks,
+  thumbnail,
+} from "@/server/external/dropbox";
 import { fixtureRoll } from "@/server/external/fixtureRoll";
 import type { PhotoMeta } from "@/server/domain/cluster";
 
@@ -14,6 +20,8 @@ export type PhotoSource = {
   list(): Promise<PhotoMeta[]>;
   /** Short-lived viewable URLs for a handful of paths. Never persist these. */
   links(paths: string[]): Promise<string[]>;
+  /** JPEG bytes for one path, transcoded — the form a browser can actually show. */
+  thumbnail(path: string): Promise<ArrayBuffer>;
 };
 
 const FOLDER = process.env.DROPBOX_CAMERA_FOLDER ?? "/Camera Uploads";
@@ -23,6 +31,7 @@ function dropboxSource(): PhotoSource {
     kind: "dropbox",
     list: async () => listFolder(await accessToken(), FOLDER),
     links: async (paths) => temporaryLinks(await accessToken(), paths),
+    thumbnail: async (path) => thumbnail(await accessToken(), path),
   };
 }
 
@@ -31,6 +40,9 @@ function fixtureSource(): PhotoSource {
     kind: "fixture",
     list: async () => fixtureRoll(),
     links: async () => [],
+    thumbnail: async () => {
+      throw new Error("The sample roll has no image files — link Dropbox to see photos");
+    },
   };
 }
 
