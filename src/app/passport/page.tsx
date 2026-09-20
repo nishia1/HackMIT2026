@@ -29,10 +29,10 @@ export default function PassportPage() {
             land here.
           </p>
           <Link
-            href="/explore"
+            href="/discover"
             className="mt-4 inline-block rounded-md bg-string px-4 py-2 text-paper"
           >
-            Go explore
+            Go discover
           </Link>
         </div>
       ) : (

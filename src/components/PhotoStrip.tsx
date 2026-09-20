@@ -1,5 +1,5 @@
 import { stampsFor } from "@/server/services/events";
-import { isConfigured } from "@/server/db";
+import { isDbConfigured } from "@/server/db/client";
 
 /**
  * What you actually came to the card for. The strings say you know someone;
@@ -13,7 +13,7 @@ const when = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
 export default async function PhotoStrip({ personId }: { personId: string }) {
-  if (!isConfigured()) return null;
+  if (!isDbConfigured()) return null;
 
   let stamps;
   try {

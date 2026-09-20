@@ -40,6 +40,10 @@ export async function confirmEvents(
       memories: e.photoPaths.map(
         (dropboxPath): Memory => ({
           dropboxPath,
+          // Deliberately never filled: Dropbox links expire in four hours, so
+          // a stored one is a broken image tomorrow. /api/photo mints a fresh
+          // view from dropboxPath on every read instead.
+          thumbUrl: null,
           caption: null,
           stampTitle: e.title,
           stampEmoji: "📷",

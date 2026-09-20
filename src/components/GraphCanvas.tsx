@@ -1,137 +1,115 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Thread from "./Thread";
-import type { GNode } from "@/lib/graph/types";
+import { colorFor } from "@/server/domain/tiers";
+import type { StringView } from "@/lib/types";
 
 /**
- * Your Circle. Not a friend list — everything one hop out, people and courses
- * and clubs alike, because the point of the product is that they're the same
- * kind of thing.
+ * The circle. One thread from you to every person you have history with.
  *
  * The layout is deterministic rather than force-simulated: your world should
- * look the same every time you open it, the way a map does. Nodes are grouped
- * into arcs by type so the eye can find "my classes" without a legend.
+ * look the same every time you open it, the way a map does. Thickest strings
+ * go to the top and the rest alternate left and right, so the ones that
+ * matter are never buried at the bottom of the ring.
  */
 
-const RING_ORDER: GNode["type"][] = [
-  "PERSON",
-  "CLUB",
-  "PROJECT",
-  "COURSE",
-  "EVENT",
-  "INTEREST",
-  "COMMUNITY",
-  "PLACE",
-];
-
-const TINT: Partial<Record<GNode["type"], string>> = {
-  PERSON: "var(--string)",
-  EVENT: "var(--stamp)",
-  INTEREST: "var(--field)",
-};
+const W = 360;
+const H = 360;
 
 export default function GraphCanvas({
-  center,
-  nodes,
-  links,
+  strings,
+  selectedId,
   onSelect,
 }: {
-  center: GNode;
-  nodes: GNode[];
-  links: { source: string; target: string; type: string }[];
-  onSelect?: (node: GNode) => void;
+  strings: StringView[];
+  selectedId?: string | null;
+  onSelect?: (s: StringView) => void;
 }) {
-  const [hover, setHover] = useState<string | null>(null);
-  const W = 360;
-  const H = 360;
+  const placed = useMemo(() => {
+    // strings arrive sorted by depth; fan them out from the top, alternating.
+    const order: StringView[] = [];
+    strings.forEach((s, i) => (i % 2 === 0 ? order.push(s) : order.unshift(s)));
 
-  const positions = useMemo(() => {
-    const sorted = [...nodes].sort(
-      (a, b) => RING_ORDER.indexOf(a.type) - RING_ORDER.indexOf(b.type),
-    );
-    const map = new Map<string, { x: number; y: number }>();
-    map.set(center.id, { x: W / 2, y: H / 2 });
-
-    // Two rings so a busy world doesn't crowd into one circle.
-    const inner = sorted.filter((_, i) => i % 2 === 0);
-    const outer = sorted.filter((_, i) => i % 2 === 1);
-
-    const place = (list: GNode[], radius: number, phase: number) =>
-      list.forEach((n, i) => {
-        const angle = phase + (i / Math.max(list.length, 1)) * Math.PI * 2;
-        map.set(n.id, {
-          x: W / 2 + Math.cos(angle) * radius,
-          y: H / 2 + Math.sin(angle) * radius,
-        });
-      });
-
-    place(inner, 98, -Math.PI / 2);
-    place(outer, 152, -Math.PI / 2 + 0.4);
-    return map;
-  }, [nodes, center.id]);
-
-  const isLit = (id: string) => !hover || hover === id || hover === center.id;
+    const count = Math.max(order.length, 1);
+    return order.map((s, i) => {
+      const angle = -Math.PI / 2 + (i / count) * Math.PI * 2;
+      // Longer string = colder: distance is another read of the same fact.
+      const radius = 96 + (1 - Math.min(s.warmth, 1)) * 48;
+      return {
+        s,
+        x: W / 2 + Math.cos(angle) * radius,
+        y: H / 2 + Math.sin(angle) * radius,
+      };
+    });
+  }, [strings]);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Your circle">
-      {links.map((l, i) => {
-        const a = positions.get(l.source);
-        const b = positions.get(l.target);
-        if (!a || !b) return null;
-        const involvesMe = l.source === center.id || l.target === center.id;
-        return (
-          <Thread
-            key={i}
-            x1={a.x}
-            y1={a.y}
-            x2={b.x}
-            y2={b.y}
-            strength={involvesMe ? 0.8 : 0.3}
-            muted={!involvesMe || !isLit(l.target)}
-          />
-        );
-      })}
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="w-full"
+      role="img"
+      aria-label="Your circle of strings"
+    >
+      {placed.map(({ s, x, y }, i) => (
+        <Thread
+          key={s.personId}
+          x1={W / 2}
+          y1={H / 2}
+          x2={x}
+          y2={y}
+          depth={s.depth}
+          warmth={s.warmth}
+          animate
+          delay={i * 90}
+          dimmed={Boolean(selectedId) && selectedId !== s.personId}
+        />
+      ))}
 
-      {[...nodes, center].map((n) => {
-        const p = positions.get(n.id);
-        if (!p) return null;
-        const isMe = n.id === center.id;
-        const r = isMe ? 26 : n.type === "PERSON" ? 19 : 15;
-        return (
-          <g
-            key={n.id}
-            transform={`translate(${p.x} ${p.y})`}
-            tabIndex={0}
-            role="button"
-            aria-label={`${n.name}, ${n.type.toLowerCase()}`}
-            onClick={() => onSelect?.(n)}
-            onKeyDown={(e) => e.key === "Enter" && onSelect?.(n)}
-            onMouseEnter={() => setHover(n.id)}
-            onMouseLeave={() => setHover(null)}
-            className="cursor-pointer"
-            opacity={isLit(n.id) ? 1 : 0.45}
+      <g transform={`translate(${W / 2} ${H / 2})`}>
+        <circle r={26} fill="var(--paper)" stroke="var(--ink)" strokeWidth={2.5} />
+        <text textAnchor="middle" dominantBaseline="central" fontSize={18}>
+          🧵
+        </text>
+      </g>
+
+      {placed.map(({ s, x, y }) => (
+        <g
+          key={s.personId}
+          transform={`translate(${x} ${y})`}
+          tabIndex={0}
+          role="button"
+          aria-label={`${s.name}, ${s.tier}, ${s.eventCount} shared events`}
+          onClick={() => onSelect?.(s)}
+          onKeyDown={(e) => e.key === "Enter" && onSelect?.(s)}
+          className="cursor-pointer"
+          opacity={!selectedId || selectedId === s.personId ? 1 : 0.5}
+        >
+          <circle
+            r={19}
+            fill="var(--paper)"
+            stroke={colorFor(s.warmth)}
+            strokeWidth={selectedId === s.personId ? 3 : 1.75}
+          />
+          <text
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={14}
+            className="font-display"
+            fill="var(--ink)"
           >
-            <circle
-              r={r}
-              fill="var(--paper)"
-              stroke={isMe ? "var(--ink)" : (TINT[n.type] ?? "var(--ink-soft)")}
-              strokeWidth={isMe ? 2.5 : 1.5}
-            />
-            <text textAnchor="middle" dominantBaseline="central" fontSize={isMe ? 20 : 14}>
-              {n.emoji ?? n.name.slice(0, 1)}
-            </text>
-            <text
-              y={r + 13}
-              textAnchor="middle"
-              fontSize={9.5}
-              fill="var(--ink-soft)"
-              className="font-display"
-            >
-              {n.name.length > 16 ? `${n.name.slice(0, 15)}…` : n.name}
-            </text>
-          </g>
-        );
-      })}
+            {s.name.slice(0, 2)}
+          </text>
+          <text
+            y={32}
+            textAnchor="middle"
+            fontSize={10}
+            fill="var(--ink-soft)"
+            className="font-display"
+          >
+            {s.name}
+          </text>
+        </g>
+      ))}
     </svg>
   );
 }

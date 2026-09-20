@@ -1,4 +1,5 @@
 "use client";
+import { colorFor, strokeFor } from "@/server/domain/tiers";
 
 /**
  * A thread between two points.
@@ -7,6 +8,12 @@
  * pushed perpendicular to the run and jittered by a hash of the endpoints, so
  * every thread has its own slight bow and no two are identical. Straight lines
  * read as a network diagram. Uneven bowed ones read as string.
+ *
+ * Thickness is depth, colour is warmth, and the two never touch each other —
+ * that's the whole visual argument of the app.
+ *
+ * `tiers.ts` is pure, so importing it here costs nothing at the client
+ * boundary.
  */
 
 function hash(a: number, b: number) {
@@ -33,18 +40,20 @@ export default function Thread({
   y1,
   x2,
   y2,
-  strength = 1,
+  depth = 1,
+  warmth = 1,
   animate = false,
-  muted = false,
+  dimmed = false,
   delay = 0,
 }: {
   x1: number;
   y1: number;
   x2: number;
   y2: number;
-  strength?: number;
+  depth?: number;
+  warmth?: number;
   animate?: boolean;
-  muted?: boolean;
+  dimmed?: boolean;
   delay?: number;
 }) {
   const { d, length } = threadPath(x1, y1, x2, y2);
@@ -52,9 +61,9 @@ export default function Thread({
     <path
       d={d}
       fill="none"
-      stroke={muted ? "var(--ink-soft)" : "var(--string)"}
-      strokeOpacity={muted ? 0.28 : 0.45 + strength * 0.45}
-      strokeWidth={muted ? 1 : 1 + strength * 1.6}
+      stroke={colorFor(warmth)}
+      strokeOpacity={dimmed ? 0.35 : 0.9}
+      strokeWidth={strokeFor(depth)}
       strokeLinecap="round"
       className={animate ? "thread-draw" : undefined}
       style={
