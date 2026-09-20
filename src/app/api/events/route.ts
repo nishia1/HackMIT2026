@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { confirmEvents, type ConfirmedEvent } from "@/server/services/events";
-import { allEvents } from "@/server/repo/events";
+import { eventsFor } from "@/server/repo/events";
+import { withUser } from "@/server/services/respond";
 
 /**
  * The write the whole import funnels into. Until this runs, a candidate is
@@ -17,19 +18,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No events to save" }, { status: 400 });
   }
 
-  try {
-    return NextResponse.json(await confirmEvents(incoming));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not save events";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+  return withUser((userId) => confirmEvents(userId, incoming));
 }
 
+/** Your own history. Never anyone else's. */
 export async function GET() {
-  try {
-    return NextResponse.json({ events: await allEvents() });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not read events";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+  return withUser(async (userId) => ({ events: await eventsFor(userId) }));
 }

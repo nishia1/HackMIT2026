@@ -1,17 +1,11 @@
-import { NextResponse } from "next/server";
 import { stampsFor } from "@/server/services/events";
+import { withUser } from "@/server/services/respond";
 
-/** Every photo from every event this person was tagged in, newest first. */
+/** Every photo from every event you and this person were both at, newest first. */
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-
-  try {
-    return NextResponse.json({ stamps: await stampsFor(id) });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Could not read photos";
-    return NextResponse.json({ error: message }, { status: 502 });
-  }
+  return withUser(async (meId) => ({ stamps: await stampsFor(meId, id) }));
 }

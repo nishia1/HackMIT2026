@@ -5,8 +5,9 @@ import { MongoClient, type Db } from "mongodb";
  * because Next re-evaluates modules on every edit and Atlas M0 allows 500
  * connections, not 5,000.
  *
- * With no MONGODB_URI set this returns null and the repo layer falls back to
- * the seeded demo world in memory, so `npm run dev` works on a fresh clone.
+ * There is no in-memory fallback. Every read is a real user's real data, and
+ * a missing MONGODB_URI used to mean the app quietly served someone else's
+ * seeded history instead of saying so.
  */
 
 const globalForMongo = globalThis as typeof globalThis & {
@@ -17,9 +18,11 @@ export function isDbConfigured() {
   return Boolean(process.env.MONGODB_URI);
 }
 
-export async function getDb(): Promise<Db | null> {
+export async function getDb(): Promise<Db> {
   const uri = process.env.MONGODB_URI;
-  if (!uri) return null;
+  if (!uri) {
+    throw new Error("No MONGODB_URI — set one in .env.local, or in the Vercel project settings.");
+  }
 
   globalForMongo.__mongo ??= new MongoClient(uri, {
     // The default is 30s, which on stage reads as "the app is broken". Five

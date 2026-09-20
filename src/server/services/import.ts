@@ -29,13 +29,12 @@ export type Candidate = {
 };
 
 export type ImportResult = {
-  source: "dropbox" | "fixture";
   photoCount: number;
   candidates: Candidate[];
 };
 
-export async function findCandidates(gapHours = 6): Promise<ImportResult> {
-  const source = photoSource();
+export async function findCandidates(meId: string, gapHours = 6): Promise<ImportResult> {
+  const source = await photoSource(meId);
   const photos: PhotoMeta[] = await source.list();
   const clusters = clusterByGap(photos, gapHours);
 
@@ -47,12 +46,13 @@ export async function findCandidates(gapHours = 6): Promise<ImportResult> {
       startsAt: cluster.startsAt,
       endsAt: cluster.endsAt,
       photoCount: cluster.photos.length,
-      sampleUrls: source.kind === "dropbox" ? samplePaths.map(photoUrl) : [],
+      // Your own roll, so you are the owner of every preview here.
+      sampleUrls: samplePaths.map((p) => photoUrl(p, meId)),
       samplePaths,
       photoPaths: cluster.photos.map((p) => p.path),
     };
   });
 
   candidates.sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt));
-  return { source: source.kind, photoCount: photos.length, candidates };
+  return { photoCount: photos.length, candidates };
 }

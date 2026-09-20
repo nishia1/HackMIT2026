@@ -11,6 +11,34 @@ import type { Cluster } from "@/server/domain/cluster";
 
 export type Label = { title: string; kind: string };
 
+/**
+ * The kinds an event can be, and the emoji each one stamps with.
+ *
+ * Deliberately a closed list. Asking someone to pick an emoji is one more
+ * decision per event and the import already asks for two; deriving it from the
+ * kind means the stamps on a string stay legible as a set rather than becoming
+ * whatever eleven different emoji someone chose at 2am.
+ *
+ * The first five are what `templateLabel` guesses, so the picker always
+ * contains the value already selected.
+ */
+export const KINDS = [
+  { kind: "morning", emoji: "☕" },
+  { kind: "outing", emoji: "🚶" },
+  { kind: "dinner", emoji: "🍜" },
+  { kind: "night out", emoji: "🌃" },
+  { kind: "day out", emoji: "☀️" },
+  { kind: "hike", emoji: "🥾" },
+  { kind: "concert", emoji: "🎵" },
+  { kind: "party", emoji: "🎉" },
+  { kind: "trip", emoji: "✈️" },
+  { kind: "study", emoji: "📚" },
+] as const;
+
+/** A thread for anything we don't recognise — including the seeded world's kinds. */
+export const emojiFor = (kind: string): string =>
+  KINDS.find((k) => k.kind === kind)?.emoji ?? "🧵";
+
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function templateLabel(cluster: Cluster): Label {

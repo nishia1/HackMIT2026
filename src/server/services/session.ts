@@ -1,9 +1,25 @@
-import { ME } from "@/server/db/demo-world";
+import { auth } from "@/auth";
 
 /**
- * Who you're signed in as. Dev 2 owns auth; until it lands every read path
- * goes through this one function, so wiring it up is a one-line change.
+ * Who you're signed in as. Every read path goes through this one function, so
+ * there is exactly one place that decides whose data a request may see.
  */
-export function currentUserId(): string {
-  return process.env.DEMO_USER_ID ?? ME;
+export async function requireUserId(): Promise<string> {
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) throw new UnauthorizedError();
+  return id;
+}
+
+/** Null instead of throwing, for the places that render a signed-out state. */
+export async function optionalUserId(): Promise<string | null> {
+  const session = await auth();
+  return session?.user?.id ?? null;
+}
+
+export class UnauthorizedError extends Error {
+  constructor() {
+    super("Not signed in");
+    this.name = "UnauthorizedError";
+  }
 }
