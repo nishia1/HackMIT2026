@@ -106,7 +106,7 @@ external }` and `domain/` imports nothing at all. Not the database, not
 
 OAuth ate more hours than the entire graph engine. Google's unverified-app test
 user rules, `redirect_uri_mismatch` across Vercel preview URLs, and Dropbox's
-four-hour token expiry each cost us real time. Working through perm issues taught us a lot about the reality of developing!
+four-hour token expiry each cost us real time. Working through perm issues taught us a lot about the reality of developing! Debugging deployment perms was honestly a nightmare but it taught us a lot about the way Vercel vs standard local environments parse API keys and how small mistakes can compound over time.
 
 We also learned that campus wifi blocks MongoDB's port 27017, which turns a
 working app into a broken one until someone thinks to try a
