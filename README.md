@@ -1,6 +1,6 @@
 # Invisible String
 
-** Enter Slogan here..... **
+**invisible strings connect us all!**
 
 HackMIT 2026 · [hack-mit-2026.vercel.app](https://hack-mit-2026.vercel.app)
 
