@@ -5,10 +5,10 @@ import { type GroupChatMember } from "@/lib/groupChatMembers";
  * coordinates and emitted as percentages, so the whole graph scales with the
  * container while keeping the Figma proportions exactly.
  */
-// const FRAME_W = 412;
-// const FRAME_H = 800;
-const FRAME_W = 112;
-const FRAME_H = 96;
+const FRAME_W = 412;
+const FRAME_H = 800;
+const FILLER_W = 112;
+const FILLER_H = 96;
 /**
  * Empty grid below the graph, in the same units. The people and their boxes
  * all live in the top FRAME_H; this is just paper underneath them, so the
@@ -69,8 +69,8 @@ const CHAR_SRC = "/circle/group-character.png";
  * the boxes shrink from the design's size once there are more of them than
  * the design's eight, or a big group's boxes merge into one grey slab.
  */
-const FILLER_W = 94;
-const FILLER_H = 80;
+// const FILLER_W = 94;
+// const FILLER_H = 80;
 
 /**
  * How many boxes to show at most. Not every pair gets one: the design has
