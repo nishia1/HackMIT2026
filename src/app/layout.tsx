@@ -12,6 +12,14 @@ export const metadata: Metadata = {
   description: "There are more connections around you than you can see.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Invisible String", statusBarStyle: "default" },
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
