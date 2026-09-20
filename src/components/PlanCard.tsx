@@ -150,15 +150,9 @@ export default function PlanCard({ name, plans, onPick }: PlanCardProps) {
             placed ? "border border-ink/25 bg-paper text-inkSoft" : "bg-ink text-paper"
           }`}
         >
-          {placed ? "Placed" : "Place it"}
+          {placed ? `Placed on ${name}’s calendar` : "Place it"}
         </button>
       </div>
-
-      {placed && (
-        <footer role="status" className="border-t border-ink/15 px-5 py-3 text-sm text-inkSoft">
-          On {name}&rsquo;s calendar. It becomes a stamp once you&rsquo;ve done it.
-        </footer>
-      )}
     </section>
   );
 }
