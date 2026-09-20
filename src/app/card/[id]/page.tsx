@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ConnectionCard from "@/components/ConnectionCard";
+import PhotoStrip from "@/components/PhotoStrip";
 import { getPerson } from "@/lib/world";
 
 export default async function CardPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,6 +24,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
       {!view.known && (
         <p className="mt-4 text-inkSoft">You two haven&rsquo;t met yet.</p>
       )}
+      <PhotoStrip personId={id} />
     </div>
   );
 }

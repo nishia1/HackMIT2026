@@ -1,6 +1,7 @@
 import { clusterByGap, samplePhotos, type PhotoMeta } from "@/server/domain/cluster";
 import { templateLabel } from "@/server/domain/label";
 import { photoSource } from "@/server/external/storage";
+import { photoUrl } from "@/lib/photo";
 
 /**
  * Read the roll, cut it into events, hand them back **unsaved**.
@@ -17,9 +18,14 @@ export type Candidate = {
   startsAt: string;
   endsAt: string;
   photoCount: number;
-  /** Up to three temporary links, spread across the event. Expire in 4 hours. */
+  /**
+   * Up to three previews spread across the event, served through /api/photo —
+   * stable URLs, and JPEG even when the roll is HEIC.
+   */
   sampleUrls: string[];
   samplePaths: string[];
+  /** Every photo in the cluster. These are what get written to the event. */
+  photoPaths: string[];
 };
 
 export type ImportResult = {
@@ -33,21 +39,19 @@ export async function findCandidates(gapHours = 6): Promise<ImportResult> {
   const photos: PhotoMeta[] = await source.list();
   const clusters = clusterByGap(photos, gapHours);
 
-  const candidates = await Promise.all(
-    clusters.map(async (cluster): Promise<Candidate> => {
-      const samples = samplePhotos(cluster);
-      const samplePaths = samples.map((p) => p.path);
-      return {
-        id: `c_${cluster.startsAt}`,
-        ...templateLabel(cluster),
-        startsAt: cluster.startsAt,
-        endsAt: cluster.endsAt,
-        photoCount: cluster.photos.length,
-        sampleUrls: await source.links(samplePaths),
-        samplePaths,
-      };
-    }),
-  );
+  const candidates = clusters.map((cluster): Candidate => {
+    const samplePaths = samplePhotos(cluster).map((p) => p.path);
+    return {
+      id: `c_${cluster.startsAt}`,
+      ...templateLabel(cluster),
+      startsAt: cluster.startsAt,
+      endsAt: cluster.endsAt,
+      photoCount: cluster.photos.length,
+      sampleUrls: source.kind === "dropbox" ? samplePaths.map(photoUrl) : [],
+      samplePaths,
+      photoPaths: cluster.photos.map((p) => p.path),
+    };
+  });
 
   candidates.sort((a, b) => +new Date(b.startsAt) - +new Date(a.startsAt));
   return { source: source.kind, photoCount: photos.length, candidates };

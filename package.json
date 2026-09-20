@@ -10,9 +10,10 @@
     "check": "tsc --noEmit",
     "verify": "tsx scripts/verify-demo.ts",
     "verify:import": "tsx scripts/verify-import.ts",
-    "dropbox:auth": "tsx scripts/dropbox-authorize.ts"
+    "dropbox:auth": "tsx --env-file-if-exists=.env.local scripts/dropbox-authorize.ts"
   },
   "dependencies": {
+    "mongodb": "^7.6.0",
     "next": "^15.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

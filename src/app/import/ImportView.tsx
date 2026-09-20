@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import TagAttendees from "@/app/import/TagAttendees";
-import { useImportedEvents } from "@/lib/imported";
 import type { Candidate, ImportResult } from "@/server/services/import";
+import type { EventDoc } from "@/lib/types";
 
 export type Person = { id: string; name: string; emoji: string | null };
 
@@ -18,12 +18,33 @@ const plural = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
 
 export default function ImportView({ people }: { people: Person[] }) {
-  const { events, ready, save, clear } = useImportedEvents();
   const [result, setResult] = useState<ImportResult | null>(null);
   const [tags, setTags] = useState<Record<string, string[]>>({});
   const [scanning, setScanning] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<{ added: number; skipped: number } | null>(null);
+  const [stored, setStored] = useState<EventDoc[]>([]);
+
+  const nameList = (ids: string[]) => {
+    const byId = new Map(people.map((p) => [p.id, p.name]));
+    return ids.map((id) => byId.get(id) ?? id).join(", ");
+  };
+
+  // What is already in the database, so a refresh shows your real history.
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/events");
+      const data = (await res.json()) as { events?: EventDoc[] };
+      if (res.ok) setStored(data.events ?? []);
+    } catch {
+      // No database yet is a fine state — the import screen still works.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   async function scan() {
     setScanning(true);
@@ -59,27 +80,35 @@ export default function ImportView({ people }: { people: Person[] }) {
 
   const tagged = (result?.candidates ?? []).filter((c) => (tags[c.id] ?? []).length > 0);
 
-  function confirm() {
-    const byId = new Map(people.map((p) => [p.id, p.name]));
-    const known = new Set(events.map((e) => e.id));
-    save(
-      tagged.map((c: Candidate) => {
-        const attendeeIds = tags[c.id] ?? [];
-        return {
-          id: c.id,
-          title: c.title,
-          kind: c.kind,
-          happenedAt: c.startsAt,
-          photoCount: c.photoCount,
-          attendeeIds,
-          attendeeNames: attendeeIds.map((id) => byId.get(id) ?? id),
-        };
-      }),
-    );
-    const added = tagged.filter((c) => !known.has(c.id)).length;
-    setSaved({ added, skipped: tagged.length - added });
-    setResult(null);
-    setTags({});
+  async function confirm() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          events: tagged.map((c: Candidate) => ({
+            id: c.id,
+            title: c.title,
+            kind: c.kind,
+            happenedAt: c.startsAt,
+            attendeeIds: tags[c.id] ?? [],
+            photoPaths: c.photoPaths,
+          })),
+        }),
+      });
+      const data = (await res.json()) as { added?: number; updated?: number; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not save events");
+      setSaved({ added: data.added ?? 0, skipped: data.updated ?? 0 });
+      setResult(null);
+      setTags({});
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save events");
+    } finally {
+      setSaving(false);
+    }
   }
 
   // The tab bar is fixed to the bottom; without this the last button sits under it.
@@ -141,6 +170,20 @@ export default function ImportView({ people }: { people: Person[] }) {
                 <p className="text-sm text-inkSoft">
                   {when(c.startsAt)} · {plural(c.photoCount, "photo")} · {c.kind}
                 </p>
+                {c.sampleUrls.length > 0 && (
+                  <div className="mt-2 flex gap-2">
+                    {c.sampleUrls.map((src) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={src}
+                        src={src}
+                        alt=""
+                        loading="lazy"
+                        className="h-20 w-20 rounded-md border border-ink/15 object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
                 <TagAttendees
                   people={people}
                   selected={tags[c.id] ?? []}
@@ -152,12 +195,14 @@ export default function ImportView({ people }: { people: Person[] }) {
 
           <button
             onClick={confirm}
-            disabled={tagged.length === 0}
+            disabled={tagged.length === 0 || saving}
             className="mt-7 rounded-md bg-string px-4 py-2 text-paper disabled:opacity-40"
           >
-            {tagged.length === 0
-              ? "Tag someone to continue"
-              : `Save ${plural(tagged.length, "event")}`}
+            {saving
+              ? "Saving…"
+              : tagged.length === 0
+                ? "Tag someone to continue"
+                : `Save ${plural(tagged.length, "event")}`}
           </button>
           <p className="mt-2 text-sm text-inkSoft">
             Untagged events are discarded — an event with nobody in it belongs to no
@@ -166,29 +211,20 @@ export default function ImportView({ people }: { people: Person[] }) {
         </section>
       )}
 
-      {ready && events.length > 0 && (
+      {stored.length > 0 && (
         <section className="mt-12">
           <h2 className="font-display text-xl">Imported</h2>
           <ul className="mt-3 space-y-3">
-            {events.map((e) => (
-              <li key={e.id} className="border-t border-ink/10 pt-3">
+            {stored.map((e) => (
+              <li key={e._id} className="border-t border-ink/10 pt-3">
                 <p className="font-display">{e.title}</p>
                 <p className="text-sm text-inkSoft">
-                  {when(e.happenedAt)} · {e.attendeeNames.join(", ")} ·{" "}
-                  {plural(e.photoCount, "photo")}
+                  {when(e.happenedAt)} · {nameList(e.attendeeIds)} ·{" "}
+                  {plural(e.memories.length, "photo")}
                 </p>
               </li>
             ))}
           </ul>
-          <button
-            onClick={() => {
-              clear();
-              setSaved(null);
-            }}
-            className="mt-6 text-sm text-inkSoft underline"
-          >
-            Clear imported events
-          </button>
         </section>
       )}
     </div>
