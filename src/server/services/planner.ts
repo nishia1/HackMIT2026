@@ -129,9 +129,10 @@ async function availableSlots(
   c: PlanConstraints,
   now: Date,
 ): Promise<string[]> {
-  const freeEvenings = input.me.profile.freeEvenings.filter((d) =>
-    input.them.profile.freeEvenings.includes(d),
-  );
+  const theirDays = new Set(input.them.profile.freeWindows.map((w) => w.day));
+  const freeEvenings = input.me.profile.freeWindows
+    .map((w) => w.day)
+    .filter((d) => theirDays.has(d));
 
   if (!input.me.accessToken && !input.them.accessToken) return [];
 
@@ -142,11 +143,16 @@ async function availableSlots(
   ]);
   if (busyA === null && busyB === null) return [];
 
+  // Widest window either side keeps on any shared day. Per-day windows exist
+  // now, but findSlots still takes one range for all days.
+  const mine = input.me.profile.freeWindows.filter((w) => freeEvenings.includes(w.day));
+  const theirs = input.them.profile.freeWindows.filter((w) => freeEvenings.includes(w.day));
+
   const { freeFrom, freeTo } = overlapWindows(
-    input.me.profile.freeFrom ?? "18:00",
-    input.me.profile.freeTo ?? "22:00",
-    input.them.profile.freeFrom ?? "18:00",
-    input.them.profile.freeTo ?? "22:00",
+    mine[0]?.from ?? "18:00",
+    mine[0]?.to ?? "22:00",
+    theirs[0]?.from ?? "18:00",
+    theirs[0]?.to ?? "22:00",
   );
 
   return findSlots({ now, freeEvenings, busyA, busyB, freeFrom, freeTo })
