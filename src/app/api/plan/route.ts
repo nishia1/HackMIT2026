@@ -4,6 +4,7 @@ import { MOCK_ME_ID, MOCK_PEOPLE, MOCK_STAMPS, getMockProfile } from "@/data/moc
 import { getDb } from "@/server/db/client";
 import { requireUserId } from "@/server/services/session";
 import { findById } from "@/server/repo/users";
+import { getString } from "@/server/services/strings";
 import type { Profile } from "@/lib/types";
 
 /**
@@ -39,40 +40,55 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "now is not a valid date" }, { status: 400 });
   }
 
-  // ---- SEAM ------------------------------------------------------------
-  // Delete this block at hour 3. Replace with:
-  //   const me     = await repo.users.find(session.userId)
-  //   const them   = await repo.users.find(personId)
-  //   const stamps = (await strings.getOne(session.userId, personId, now)).stamps
-  const person = MOCK_PEOPLE[personId];
-  if (!person) return NextResponse.json({ error: "no such person" }, { status: 404 });
+  const meId = await requireUserId();
 
-  // Your real profile, keyed on the signed-in user. Falls back to the mock
-  // one only when you haven't filled yours in yet.
-  const currentUser = await findById(await requireUserId());
-  const meProfile = currentUser?.profile ?? getMockProfile(MOCK_ME_ID);
+  /**
+   * A real connection of yours, or — for the two ids the /plan harness
+   * offers — the mock pair it was built on. The mock path is kept so that
+   * harness keeps working; everything reached from the app is real.
+   */
+  const [currentUser, theirUser, string] = await Promise.all([
+    findById(meId),
+    findById(personId),
+    getString(meId, personId, now),
+  ]);
+
+  const mockPerson = MOCK_PEOPLE[personId];
+  if (!theirUser && !mockPerson) {
+    return NextResponse.json({ error: "no such person" }, { status: 404 });
+  }
 
   // No calendars: Google auth was removed, so nobody has a token and
   // `planner` skips the free/busy lookup entirely (see planner.ts:136).
   const me = {
+    // Falls back to the mock profile only when you haven't filled yours in.
     name: currentUser?.name ?? "You",
-    profile: meProfile,
+    profile: currentUser?.profile ?? getMockProfile(MOCK_ME_ID),
     accessToken: null,
   };
 
+  // Still supported for testing two real accounts' overlap by email.
   const db = await getDb();
-  const theirUser = theirEmail
+  const byEmail = theirEmail
     ? await db.collection("users").findOne({ email: theirEmail })
     : null;
 
   const them = {
     personId,
-    name: theirUser?.name ?? person.name,
-    profile: (theirUser?.profile as Profile | undefined) ?? getMockProfile(personId),
+    name: byEmail?.name ?? theirUser?.name ?? mockPerson!.name,
+    profile:
+      (byEmail?.profile as Profile | undefined) ??
+      theirUser?.profile ??
+      getMockProfile(personId),
     accessToken: null,
   };
-  const stamps = MOCK_STAMPS[personId] ?? [];
-  // ---- END SEAM --------------------------------------------------------
+
+  /**
+   * What the plan is allowed to cite. Real shared history when there is any
+   * — the planner drops a plan whose `becauseStampId` doesn't resolve, so
+   * these have to be the stamps that actually exist on this string.
+   */
+  const stamps = string?.stamps.length ? string.stamps : (MOCK_STAMPS[personId] ?? []);
 
   // Extra context pasted in the harness. Layered over their saved profile
 // for this request only. Nothing is saved.
@@ -89,7 +105,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     personId,
-    name: person.name,
+    name: them.name,
     ...result,
     // Whether each side's real calendar was actually used, so testing two
     // real Google accounts doesn't require reading server logs to confirm.

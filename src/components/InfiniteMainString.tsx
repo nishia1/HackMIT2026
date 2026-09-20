@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ViewMode } from "@/components/GroupIndividualToggle";
 import { DEFAULT_GROUP_CHAT_NAME, getGroupChatName } from "@/lib/groupChatNames";
-import type { Loop } from "@/lib/types";
+import FadingPopup from "@/components/FadingPopup";
+import type { Loop, Nudge } from "@/lib/types";
 import MainStringSegment, { type MainStringSegmentHandle } from "./MainStringSegment";
 import {
   FLIPPED_LABELS,
@@ -64,11 +65,79 @@ function displayedColors(i: number) {
 export default function InfiniteMainString({
   mode,
   loops,
+  nudges,
 }: {
   mode: ViewMode;
   loops: Loop[];
+  nudges: Nudge[];
 }) {
   const [segmentCount, setSegmentCount] = useState(INITIAL_SEGMENTS);
+  const [fading, setFading] = useState<Nudge | null>(null);
+
+  /**
+   * Who is worth stopping you for. Read through a ref inside the observer so
+   * the watcher is built once and never has to be torn down and rebuilt as
+   * the tab flips or the data arrives.
+   */
+  const nudgeByPerson = useMemo(
+    () => new Map(nudges.map((n) => [n.personId, n])),
+    [nudges],
+  );
+  const nudgeRef = useRef(nudgeByPerson);
+  nudgeRef.current = nudgeByPerson;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  /** Already said our piece about these, this visit. A reload asks again. */
+  const toldAbout = useRef<Set<string>>(new Set());
+  /** Set while a popup is up, so a second one can't open behind the first. */
+  const showing = useRef(false);
+
+  const labelPersons = useRef<Map<Element, string>>(new Map());
+  const labelObserver = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (modeRef.current !== "individual" || showing.current) return;
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const personId = labelPersons.current.get(entry.target);
+          if (!personId || toldAbout.current.has(personId)) continue;
+          const nudge = nudgeRef.current.get(personId);
+          if (!nudge) continue;
+          toldAbout.current.add(personId);
+          showing.current = true;
+          setFading(nudge);
+          break;
+        }
+      },
+      // Well inside the viewport, so the popup lands on a name you can
+      // actually see rather than one just clipping the bottom edge.
+      { threshold: 1, rootMargin: "-25% 0px -25% 0px" },
+    );
+    labelObserver.current = observer;
+    labelPersons.current.forEach((_, el) => observer.observe(el));
+    return () => {
+      observer.disconnect();
+      labelObserver.current = null;
+    };
+  }, []);
+
+  /** Handed to each label so it can register and clean up after itself. */
+  const watchLabel = useCallback((el: HTMLElement, personId: string) => {
+    labelPersons.current.set(el, personId);
+    labelObserver.current?.observe(el);
+    return () => {
+      labelObserver.current?.unobserve(el);
+      labelPersons.current.delete(el);
+    };
+  }, []);
+
+  const dismissFading = useCallback(() => {
+    showing.current = false;
+    setFading(null);
+  }, []);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const tileRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -191,6 +260,7 @@ export default function InfiniteMainString({
             index={i}
             mode={mode}
             loops={loops}
+            watchLabel={watchLabel}
             tileRef={(el) => {
               if (el) tileRefs.current.set(i, el);
               else tileRefs.current.delete(i);
@@ -211,6 +281,7 @@ export default function InfiniteMainString({
           <img ref={charImgRef} src={CHAR_FRAME_SRCS[0]} alt="" className="w-full object-contain" />
         </div>
       </div>
+      {fading && <FadingPopup nudge={fading} onDismiss={dismissFading} />}
     </div>
   );
 }
@@ -259,12 +330,14 @@ function StringTile({
   index,
   mode,
   loops,
+  watchLabel,
   tileRef,
   segmentRef,
 }: {
   index: number;
   mode: ViewMode;
   loops: Loop[];
+  watchLabel: (el: HTMLElement, personId: string) => () => void;
   tileRef: (el: HTMLDivElement | null) => void;
   segmentRef: (handle: MainStringSegmentHandle | null) => void;
 }) {
@@ -326,22 +399,64 @@ function StringTile({
           );
         }
 
+        if (mode === "individual") {
+          return (
+            <IndividualLabel
+              key={i}
+              person={person!}
+              className={`${className} hover:underline`}
+              placement={placement}
+              watch={watchLabel}
+            />
+          );
+        }
+
         return (
           <Link
             key={i}
-            href={mode === "individual" ? `/individual/${person!.personId}` : `/group-chat/${groupChatId}`}
+            href={`/group-chat/${groupChatId}`}
             className={`${className} hover:underline`}
             style={placement}
           >
-            {mode === "individual" ? (
-              person!.name
-            ) : (
-              <GroupChatLabelText id={groupChatId} />
-            )}
+            <GroupChatLabelText id={groupChatId} />
           </Link>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * One person's label on the ribbon.
+ *
+ * It registers itself with the scroll watcher rather than the parent holding
+ * a list of elements: the same person appears at several points down the
+ * scroll, so an element can't be looked up by who it names, and a label that
+ * unmounts has to take its own registration with it.
+ */
+function IndividualLabel({
+  person,
+  className,
+  placement,
+  watch,
+}: {
+  person: Loop;
+  className: string;
+  placement: React.CSSProperties;
+  watch: (el: HTMLElement, personId: string) => () => void;
+}) {
+  const ref = useRef<HTMLAnchorElement | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return watch(el, person.personId);
+  }, [watch, person.personId]);
+
+  return (
+    <Link ref={ref} href={`/individual/${person.personId}`} className={className} style={placement}>
+      {person.name}
+    </Link>
   );
 }
 

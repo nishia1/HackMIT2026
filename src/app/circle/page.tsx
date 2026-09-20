@@ -13,6 +13,6 @@ export default async function CirclePage({
   searchParams: Promise<{ now?: string }>;
 }) {
   const { now } = await searchParams;
-  const { loops } = await loadCircleLoops(now);
-  return <CircleScreen loops={loops} />;
+  const { loops, nudges } = await loadCircleLoops(now);
+  return <CircleScreen loops={loops} nudges={nudges} />;
 }

@@ -45,14 +45,26 @@ export type CircleLoops = {
 };
 
 /**
+ * Every connection worth warning you about, rather than the handful the
+ * inline nudge card had room for. Scrolling the circle can reach any of
+ * them, so the screen needs the whole set, not a top three.
+ */
+const ALL_FADING = 100;
+
+/**
  * What the circle screen renders: every connection you have, strongest first,
  * plus the ones worth a nudge. Empty on a new account — the ribbon still
  * draws, it just has no names to hang on it.
  */
 export async function loadCircleLoops(nowParam?: string | null): Promise<CircleLoops> {
-  const { now, strings, nudges } = await loadCircle(nowParam);
+  const now = parseNow(nowParam);
+  const meId = await requireUserId();
+  const [strings, nudges] = await Promise.all([
+    getStrings(meId, now),
+    getNudges(meId, now, ALL_FADING),
+  ]);
   return {
-    now,
+    now: now.toISOString(),
     loops: strings.map((s) => ({ personId: s.personId, name: s.name })),
     nudges,
   };
