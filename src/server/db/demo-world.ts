@@ -109,6 +109,10 @@ const EVENTS: EventSpec[] = [
 const iso = (anchor: Date, daysAgo: number) =>
   new Date(anchor.getTime() - daysAgo * 86_400_000).toISOString();
 
+/** Everyone in the demo world keeps the same evening window. */
+const eveningWindows = (days: number[]): UserDoc["profile"]["freeWindows"] =>
+  days.map((day) => ({ day, from: "18:00", to: "22:00" }));
+
 function memoriesOf(spec: EventSpec): Memory[] {
   return spec.stamps.map(([emoji, title, caption]) => ({
     dropboxPath: null,
@@ -136,9 +140,8 @@ export function buildWorld(anchor: Date): World {
       interests: p.interests,
       budget: p.budget,
       city: p.city,
-      freeEvenings: p.freeEvenings,
-      freeFrom: "18:00",
-      freeTo: "22:00",
+      freeWindows: eveningWindows(p.freeEvenings),
+      connectedApps: {},
     },
   }));
 
