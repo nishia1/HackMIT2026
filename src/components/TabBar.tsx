@@ -4,9 +4,9 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/circle", label: "Circle" },
-  { href: "/discover", label: "Discover" },
+  /* { href: "/discover", label: "Discover" }, */
   { href: "/import", label: "Import" },
-  { href: "/passport", label: "Passport" },
+  /*{ href: "/passport", label: "Passport" }, */
   { href: "/profile", label: "Profile" },
 ];
 
