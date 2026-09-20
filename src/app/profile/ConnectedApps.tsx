@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import type { ConnectedApps as ConnectedHandles } from "@/lib/types";
 
 /**
  * Real OAuth for any of these is a whole flow each (Spotify has one, Beli has
@@ -13,7 +14,6 @@ import { useState } from "react";
 type AppId = "spotify" | "beli" | "instagram";
 
 /** Connected apps and the username typed in for each. Missing key = not connected. */
-export type ConnectedHandles = Partial<Record<AppId, string>>;
 
 type AppSpec = {
   id: AppId;

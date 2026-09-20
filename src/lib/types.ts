@@ -92,15 +92,16 @@ export type LabelPhotos = (imageUrls: string[]) => Promise<PhotoLabel>;
 /** Dev 1 → Dev 2. One photo + caption becomes a passport stamp. */
 export type StampDraft = { stampTitle: string; stampEmoji: string; kind: string };
 
-/** Dev 1 owns it. The planner matches against this. */
+export type FreeWindow = { day: number; from: string; to: string }; // day: 0 = Sunday, "HH:MM"
+
+export type ConnectedApps = Partial<Record<"spotify" | "beli" | "instagram", string>>;
+
 export type Profile = {
-  interests: string[]; // ["bouldering", "ramen", "live music"]
+  interests: string[];
   budget: Budget;
   city: string | null;
-  freeEvenings: number[]; // 0=Sun … 6=Sat
-  /** "HH:mm", 24h. Same window applies to every day in `freeEvenings`. */
-  freeFrom: string;
-  freeTo: string;
+  freeWindows: FreeWindow[];
+  connectedApps: ConnectedApps;
 };
 
 /** Dev 1 → Dev 3 renders it in NudgeCard. */
