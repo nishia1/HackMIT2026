@@ -14,6 +14,10 @@ import type { Profile, Stamp } from "@/lib/types";
 
 export const MOCK_ME_ID = "me";
 
+/** Same 18:00–22:00 window on each of the given days. */
+const evenings = (days: number[]): Profile["freeWindows"] =>
+  days.map((day) => ({ day, from: "18:00", to: "22:00" }));
+
 const profiles = new Map<string, Profile>([
   [
     MOCK_ME_ID,
@@ -21,9 +25,8 @@ const profiles = new Map<string, Profile>([
       interests: ["ramen", "bouldering", "live music", "film photography"],
       budget: "cheap",
       city: "Cambridge, MA",
-      freeEvenings: [2, 4, 6], // Tue, Thu, Sat
-      freeFrom: "18:00",
-      freeTo: "22:00",
+      freeWindows: evenings([2, 4, 6]), // Tue, Thu, Sat
+      connectedApps: {},
     },
   ],
   [
@@ -32,9 +35,8 @@ const profiles = new Map<string, Profile>([
       interests: ["ramen", "pottery", "live music", "long walks"],
       budget: "mid",
       city: "Cambridge, MA",
-      freeEvenings: [4, 5, 6],
-      freeFrom: "18:00",
-      freeTo: "22:00",
+      freeWindows: evenings([4, 5, 6]),
+      connectedApps: {},
     },
   ],
   [
@@ -43,9 +45,8 @@ const profiles = new Map<string, Profile>([
       interests: ["bouldering", "board games", "coffee"],
       budget: "free",
       city: "Seattle, WA", // different city on purpose — exercises the virtual path
-      freeEvenings: [0, 6],
-      freeFrom: "18:00",
-      freeTo: "22:00",
+      freeWindows: evenings([0, 6]),
+      connectedApps: {},
     },
   ],
 ]);
@@ -131,9 +132,8 @@ export function getMockProfile(userId: string): Profile {
       interests: [],
       budget: "cheap",
       city: null,
-      freeEvenings: [],
-      freeFrom: "18:00",
-      freeTo: "22:00",
+      freeWindows: [],
+      connectedApps: {},
     }
   );
 }
