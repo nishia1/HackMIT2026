@@ -1,6 +1,6 @@
 # Invisible String
 
-** **
+** Enter Slogan here..... **
 
 HackMIT 2026 · [hack-mit-2026.vercel.app](https://hack-mit-2026.vercel.app)
 
@@ -9,12 +9,12 @@ HackMIT 2026 · [hack-mit-2026.vercel.app](https://hack-mit-2026.vercel.app)
 ## Inspiration
 
 Every social app is built to help you meet new people. None of them help you
-keep the ones you already have. Friendships don't usually end — they just
+keep the ones you already have. Friendships don't usually end, they just
 quietly fade, and you don't notice until it's been eight months since you saw
 someone who used to be your closest friend. We wanted to build the thing that
 notices.
 
-The insight that made it work: you've already documented every friendship you
+The insight that made it work is the fact that you've already documented every friendship you
 have. It's sitting in your camera roll.
 
 ---
@@ -27,14 +27,14 @@ something together, and fades from red toward grey every month you don't.
 Point it at your Dropbox and it clusters a year of photos into events, then asks
 who was with you. A year of friendships lights up at once. From there:
 
-- **The circle** — your whole social world as one picture. Thickness is how much
+- **The circle**: your whole social world as one picture. Thickness is how much
   history exists; colour is how alive it is. A thick grey rope means *this
   mattered and you're losing it*.
-- **Nudges** — strings decay on a 90-day half-life, so the app can tell you who
+- **Nudges**: strings decay on a 90-day half-life, so the app can tell you who
   you're losing, ranked by how much history you're losing times how cold it's gone.
-- **Plans** — three concrete things to do together, matched to both people's
+- **Plans**: three concrete things to do together, matched to both people's
   interests and budget, each one citing a real shared memory.
-- **Passport & Wrapped** — every event becomes a stamp; the year closes as a
+- **Passport & Wrapped**: every event becomes a stamp; the year closes as a
   scrapbook.
 
 ---
@@ -43,12 +43,12 @@ who was with you. A year of friendships lights up at once. From there:
 
 Next.js 15 · React 18 · Tailwind · MongoDB Atlas · Dropbox · OpenAI
 `gpt-4o-mini` · Vercel
-Deployed as a PWA so users can make it a iPhone shortcut and essentially use it like a mobile app
+Deployed as a PWA so users can make it a iPhone shortcut and use it effectively as a mobile app
 
 ### The schema is the graph
 
 There is no friendships table doing the work. `attendeeIds` on an event **is**
-the edge — if you and Maya are both in the array, that event thickens the string
+the edge. If you and another person are both in the array, that event thickens the string
 between you. Every string in the app falls out of one query:
 
 ```js
@@ -63,7 +63,7 @@ never read apart from it — the event and its photos are always fetched togethe
 
 Depth and warmth are computed from the events collection on every read, with
 `now` passed in as an argument rather than read from the clock. Decay is
-therefore always correct — no cron job, no cache invalidation — and we get
+therefore always correct with no cron job or cache invalidation and we get
 `?now=2026-12-31` time travel for free, which is how we demo a red string going
 grey on stage.
 
@@ -78,14 +78,14 @@ call. Forty downloads, not 2,400.
 
 ### The AI is never trusted with the math
 
-It labels photos, writes copy, and proposes plans — but it never computes
+It labels photos, writes copy, and proposes plans but it never computes
 strength, never ranks anything, and never invents a memory. Every plan must cite
 a real stamp id, and any plan citing something that doesn't exist gets dropped
 before it reaches the user. Strength and decay are arithmetic, fully
 explainable, no model in the loop.
 
-Underneath it all, one dependency rule — `app/api → services → { domain, repo,
-external }` — and `domain/` imports nothing at all. Not the database, not
+Underneath it all, one dependency rule `app/api → services → { domain, repo,
+external }` and `domain/` imports nothing at all. Not the database, not
 `fetch`, not even `Date.now()`.
 
 ---
@@ -98,7 +98,7 @@ external }` — and `domain/` imports nothing at all. Not the database, not
   and stamps.
 - **Linh** worked on AI and plans: the OpenAI layer, profile matching, the planner and
   its validation.
-- **Hannah** focused on design, crafting the UI across every screen.
+- **Hannah** focused on design, crafting the UI across every screen and integrating it into our application.
 
 ---
 
@@ -106,13 +106,12 @@ external }` — and `domain/` imports nothing at all. Not the database, not
 
 OAuth ate more hours than the entire graph engine. Google's unverified-app test
 user rules, `redirect_uri_mismatch` across Vercel preview URLs, and Dropbox's
-four-hour token expiry each cost us real time — and we'd been warned in our own
-planning doc to handle it in the first hour rather than the eighth.
+four-hour token expiry each cost us real time. Working through perm issues taught us a lot about the reality of developing!
 
 We also learned that campus wifi blocks MongoDB's port 27017, which turns a
 working app into a broken one until someone thinks to try a
-hotspot. And merging four branches into a frozen contracts file at 2am is its own
-kind of challenge — we ended up regenerating the lockfile from scratch rather
+hotspot :/ And merging four branches into a frozen contracts file at 2am is its own
+kind of challenge so we ended up regenerating the lockfile from scratch rather
 than trying to hand-resolve several thousand lines of dependency tree.
 
 ---
@@ -126,10 +125,10 @@ database, so the user confirms who was there before anything is saved.
 We kept the AI out of the arithmetic. Strength, decay, and ranking are pure
 functions; the model labels photos and writes copy, and every plan it proposes
 must cite a real memory by id or it gets dropped before the user sees it. Nothing
-on screen is a hallucinated friendship.
+on screen is a hallucinated friendship. Though we live in an increasingly digital world, we believe that AI should be used to make our lives simpler but not take away the most human experience of connection, rather enhancing it by making logistics easier!
 
 And the thing we set out to build actually renders: a rope that's thick and grey.
-That's the entire emotional argument of the product in one visual and it comes straight out of the math.
+That's the entire emotional argument of the product in one visual and it comes straight out of math (thank you Grant Sanderson for teaching us the beauty of math time and time again!).
 
 ---
 
