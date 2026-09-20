@@ -117,6 +117,14 @@ export async function createContact(input: {
  * silently reset the folder they chose, nor blank a refresh token that
  * Dropbox declined to reissue because the consent was already given.
  */
+/** What the planner matches on. Owned by the person it describes. */
+export async function setProfile(userId: string, profile: UserDoc["profile"]): Promise<void> {
+  const db = await getDb();
+  await db
+    .collection<UserDoc>(COLLECTIONS.users)
+    .updateOne({ _id: userId }, { $set: { profile } });
+}
+
 export async function setDropbox(
   userId: string,
   grant: {
