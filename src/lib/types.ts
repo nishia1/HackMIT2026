@@ -1,12 +1,16 @@
 /**
- * THE FOUR CONTRACTS
+ * THE CONTRACTS
  *
- * The entire integration surface between the three devs. Agreed at hour 0,
- * then frozen: adding a field is fine, changing one breaks somebody.
+ * The entire integration surface between the three of us. Agreed at hour 0,
+ *
+ * Nothing in here imports anything. It's types only, safe on both sides.
  */
 
 export type Tier = "alive" | "warm" | "fading" | "cold";
 
+export type Budget = "free" | "cheap" | "mid" | "splurge";
+
+/** One memory, flattened for rendering. Dev 2 produces these. */
 export type Stamp = {
   eventId: string;
   title: string; // "Ramen at 2am"
@@ -34,20 +38,6 @@ export type StringView = {
   stamps: Stamp[];
 };
 
-/** Dev 3 owns the schema, Dev 2 writes to it. */
-export type EventDoc = {
-  _id: string;
-  title: string;
-  happenedAt: string;
-  kind: string;
-  groupId: string | null;
-  createdBy: string;
-  attendeeIds: string[]; // ← this array IS the string
-  memories: Memory[];
-  /** Set by the camera-roll import. Absent on the seeded world. */
-  createdAt?: string;
-};
-
 export type Memory = {
   /**
    * The durable handle: paths outlive links, tokens and sessions. Null for a
@@ -62,6 +52,20 @@ export type Memory = {
   addedBy: string;
 };
 
+/** Dev 3 owns the schema, Dev 2 writes to it. */
+export type EventDoc = {
+  _id: string;
+  title: string;
+  happenedAt: string;
+  kind: string;
+  groupId: string | null;
+  createdBy: string;
+  attendeeIds: string[]; // ← this array IS the string
+  memories: Memory[];
+  /** Set by the camera-roll import. Absent on the seeded world. */
+  createdAt?: string;
+};
+
 /** A memory dressed for display: a viewable src, resolved at read time. */
 export type StampView = {
   eventId: string;
@@ -74,14 +78,17 @@ export type StampView = {
   src: string;
 };
 
-/** Dev 1 → Dev 2. Vision pass over 3 sample photos from a cluster. */
+/** Dev 1 → Dev 2. Vision pass over ~3 sample photos from a cluster. */
 export type PhotoLabel = { title: string; kind: string; place: string | null };
 export type LabelPhotos = (imageUrls: string[]) => Promise<PhotoLabel>;
+
+/** Dev 1 → Dev 2. One photo + caption becomes a passport stamp. */
+export type StampDraft = { stampTitle: string; stampEmoji: string; kind: string };
 
 /** Dev 1 owns it. The planner matches against this. */
 export type Profile = {
   interests: string[]; // ["bouldering", "ramen", "live music"]
-  budget: "free" | "cheap" | "mid" | "splurge";
+  budget: Budget;
   city: string | null;
   freeEvenings: number[]; // 0=Sun … 6=Sat
 };
@@ -116,3 +123,25 @@ export type Discovery = {
   pathCount: number;
   via: string[]; // names along one example chain, you and them excluded
 };
+
+/** Dev 1 → Dev 2. Six slides of Wrapped copy. */
+export type WrappedSlide = { headline: string; line: string };
+
+/** A short list of event kinds the app knows how to talk about. */
+export const EVENT_KINDS = [
+  "food",
+  "coffee",
+  "drinks",
+  "outdoors",
+  "music",
+  "sport",
+  "study",
+  "travel",
+  "party",
+  "art",
+  "games",
+  "call",
+  "other",
+] as const;
+
+export type EventKind = (typeof EVENT_KINDS)[number];
