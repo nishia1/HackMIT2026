@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Budget, Profile } from "@/lib/types";
-import { auth } from "@/auth";
-import { appDb } from "@/server/db/client";
+import { getDb } from "@/server/db/client";
 
 /**
  * GET  /api/profile  →  Profile
@@ -10,16 +9,23 @@ import { appDb } from "@/server/db/client";
  * The planner is only as good as this, so the PUT validates rather than
  * trusting the client: a bad budget string would silently widen someone's
  * spending ceiling, which is the one thing the matcher must never get wrong.
+ *
+ * Auth is disabled for now (see src/auth.ts), so there's no session to key
+ * on — everyone reads/writes the one demo profile below. `getDb()` returning
+ * null (Mongo unset or unreachable) falls back to an in-memory copy instead
+ * of 500ing, same idea as the rest of the app's demo-world fallback.
  */
 
 const BUDGETS: Budget[] = ["free", "cheap", "mid", "splurge"];
 const EMPTY: Profile = { interests: [], budget: "cheap", city: null, freeEvenings: [] };
+const DEMO_EMAIL = "you@example.com";
+
+let memoryProfile: Profile | null = null;
 
 export async function GET() {
-  const email = await signedInEmail();
-  if (!email) return NextResponse.json({ error: "sign in required" }, { status: 401 });
-  const db = await appDb();
-  const user = await db.collection("users").findOne({ email });
+  const db = await getDb().catch(() => null);
+  if (!db) return NextResponse.json(memoryProfile ?? EMPTY);
+  const user = await db.collection("users").findOne({ email: DEMO_EMAIL });
   return NextResponse.json((user?.profile as Profile | undefined) ?? EMPTY);
 }
 
@@ -34,21 +40,16 @@ export async function PUT(req: Request) {
   const parsed = parseProfile(body);
   if ("error" in parsed) return NextResponse.json(parsed, { status: 400 });
 
-  const email = await signedInEmail();
-  if (!email) return NextResponse.json({ error: "sign in required" }, { status: 401 });
-  const db = await appDb();
-  const result = await db.collection("users").findOneAndUpdate(
-    { email },
-    { $set: { profile: parsed.profile } },
-    { returnDocument: "after" },
-  );
-  if (!result) return NextResponse.json({ error: "account not found" }, { status: 404 });
-  return NextResponse.json(parsed.profile);
-}
+  const db = await getDb().catch(() => null);
+  if (!db) {
+    memoryProfile = parsed.profile;
+    return NextResponse.json(parsed.profile);
+  }
 
-async function signedInEmail(): Promise<string | null> {
-  const session = await auth();
-  return session?.user?.email ?? null;
+  await db
+    .collection("users")
+    .updateOne({ email: DEMO_EMAIL }, { $set: { profile: parsed.profile } }, { upsert: true });
+  return NextResponse.json(parsed.profile);
 }
 
 function parseProfile(input: unknown): { profile: Profile } | { error: string } {

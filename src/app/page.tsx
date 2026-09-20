@@ -1,7 +1,6 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 
-export default async function Home() {
-  const session = await auth();
-  redirect(session?.user ? "/circle" : "/signin");
+// Auth is disabled for now (see src/auth.ts) — straight into the app.
+export default function Home() {
+  redirect("/circle");
 }

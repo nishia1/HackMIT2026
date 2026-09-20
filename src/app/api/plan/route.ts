@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { planMeetup } from "@/server/services/planner";
 import { MOCK_ME_ID, MOCK_PEOPLE, MOCK_STAMPS, getMockProfile } from "@/data/mock";
 import { auth } from "@/auth";
-import { appDb } from "@/server/db/client";
+import { getDb } from "@/server/db/client";
 import { calendarTokenFor } from "@/server/external/google-auth";
 import type { Profile } from "@/lib/types";
 
@@ -46,20 +46,25 @@ export async function POST(req: Request) {
   const person = MOCK_PEOPLE[personId];
   if (!person) return NextResponse.json({ error: "no such person" }, { status: 404 });
 
+  // Auth is disabled for now (see src/auth.ts), so `session` is always null —
+  // this always falls through to the mock profile below. `getDb()` returning
+  // null (Mongo unset or unreachable) just means no one gets a real calendar,
+  // same as being signed out.
   const session = await auth();
   const email = session?.user?.email ?? null;
-  const db = await appDb();
-  const currentUser = email ? await db.collection("users").findOne({ email }) : null;
+  const db = await getDb().catch(() => null);
+  const currentUser = email && db ? await db.collection("users").findOne({ email }) : null;
   const meProfile = (currentUser?.profile as Profile | undefined) ?? getMockProfile(MOCK_ME_ID);
-  const myCalendarToken = email ? await calendarTokenFor(email) : null;
+  const myCalendarToken = email && db ? await calendarTokenFor(email) : null;
 
   const me = {
     name: session?.user?.name ?? "You",
     profile: meProfile,
     accessToken: myCalendarToken,
   };
-  const theirUser = theirEmail ? await db.collection("users").findOne({ email: theirEmail }) : null;
-  const theirCalendarToken = theirEmail ? await calendarTokenFor(theirEmail) : null;
+  const theirUser =
+    theirEmail && db ? await db.collection("users").findOne({ email: theirEmail }) : null;
+  const theirCalendarToken = theirEmail && db ? await calendarTokenFor(theirEmail) : null;
 
   const them = {
     personId,
