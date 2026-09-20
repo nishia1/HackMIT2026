@@ -1,5 +1,5 @@
 import { stampsFor } from "@/server/services/events";
-import { isDbConfigured } from "@/server/db/client";
+import { requireUserId } from "@/server/services/session";
 
 /**
  * What you actually came to the card for. The strings say you know someone;
@@ -13,11 +13,9 @@ const when = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
 export default async function PhotoStrip({ personId }: { personId: string }) {
-  if (!isDbConfigured()) return null;
-
   let stamps;
   try {
-    stamps = await stampsFor(personId);
+    stamps = await stampsFor(await requireUserId(), personId);
   } catch {
     // A card that loses its photos is still a card. Never blank the page.
     return null;
@@ -43,7 +41,17 @@ export default async function PhotoStrip({ personId }: { personId: string }) {
               className="h-40 w-40 rounded-lg border border-ink/15 object-cover"
             />
             <figcaption className="mt-1 text-xs text-inkSoft">
-              {s.emoji} {s.title} · {when(s.happenedAt)}
+              {/* What the person wrote beats what we generated, when there is any. */}
+              {s.caption ? (
+                <>
+                  <span className="block text-ink">{s.caption}</span>
+                  {when(s.happenedAt)}
+                </>
+              ) : (
+                <>
+                  {s.emoji} {s.title} · {when(s.happenedAt)}
+                </>
+              )}
             </figcaption>
           </figure>
         ))}

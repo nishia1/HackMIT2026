@@ -1,21 +1,24 @@
 import {
   accessToken,
-  isConfigured,
   listFolder,
+  listFolders,
   temporaryLinks,
   thumbnail,
 } from "@/server/external/dropbox";
-import { fixtureRoll } from "@/server/external/fixtureRoll";
+import { findById } from "@/server/repo/users";
 import type { PhotoMeta } from "@/server/domain/cluster";
 
 /**
  * The seam every photo read goes through. Nothing above this file knows the
  * word "Dropbox" — so a dead OAuth token at hour nine is a one-line switch,
- * not a rewrite, and the demo still runs on the fixture roll either way.
+ * not a rewrite.
+ *
+ * A source is always somebody's. There is no app-wide roll and no sample one:
+ * a photo shown to a user came out of that user's own account, or it is not
+ * shown at all.
  */
 
 export type PhotoSource = {
-  kind: "dropbox" | "fixture";
   /** Metadata for the whole roll. No image bytes cross this line. */
   list(): Promise<PhotoMeta[]>;
   /** Short-lived viewable URLs for a handful of paths. Never persist these. */
@@ -24,28 +27,40 @@ export type PhotoSource = {
   thumbnail(path: string): Promise<ArrayBuffer>;
 };
 
-const FOLDER = process.env.DROPBOX_CAMERA_FOLDER ?? "/Camera Uploads";
-
-function dropboxSource(): PhotoSource {
-  return {
-    kind: "dropbox",
-    list: async () => listFolder(await accessToken(), FOLDER),
-    links: async (paths) => temporaryLinks(await accessToken(), paths),
-    thumbnail: async (path) => thumbnail(await accessToken(), path),
-  };
+export class NotConnectedError extends Error {
+  constructor(message = "Dropbox is not connected") {
+    super(message);
+    this.name = "NotConnectedError";
+  }
 }
 
-function fixtureSource(): PhotoSource {
+export class NoFolderError extends Error {
+  constructor(message = "No folder chosen yet") {
+    super(message);
+    this.name = "NoFolderError";
+  }
+}
+
+export async function photoSource(userId: string): Promise<PhotoSource> {
+  const user = await findById(userId);
+  if (!user?.dropbox?.refreshToken) throw new NotConnectedError();
+
+  const folder = user.dropbox.folder;
+
   return {
-    kind: "fixture",
-    list: async () => fixtureRoll(),
-    links: async () => [],
-    thumbnail: async () => {
-      throw new Error("The sample roll has no image files — link Dropbox to see photos");
+    list: async () => {
+      if (folder === null) throw new NoFolderError();
+      return listFolder(await accessToken(userId), folder);
     },
+    links: async (paths) => temporaryLinks(await accessToken(userId), paths),
+    thumbnail: async (path) => thumbnail(await accessToken(userId), path),
   };
 }
 
-export function photoSource(): PhotoSource {
-  return isConfigured() ? dropboxSource() : fixtureSource();
+/** The picker's data. Separate from PhotoSource because it runs before one exists. */
+export async function foldersFor(
+  userId: string,
+  parent = "",
+): Promise<{ name: string; path: string }[]> {
+  return listFolders(await accessToken(userId), parent);
 }
