@@ -36,6 +36,8 @@ export function findSlots({
   busyB = null,
   eveningStartHour = 18,
   eveningEndHour = 22,
+  freeFrom,
+  freeTo,
   minMinutes = 90,
   horizonDays = 14,
   limit = 3,
@@ -46,6 +48,9 @@ export function findSlots({
   busyB?: BusyBlock[] | null;
   eveningStartHour?: number;
   eveningEndHour?: number;
+  /** "HH:mm". Wins over the hour defaults when set. */
+  freeFrom?: string;
+  freeTo?: string;
   minMinutes?: number;
   horizonDays?: number;
   limit?: number;
@@ -53,6 +58,8 @@ export function findSlots({
   const busy = mergeBusy([...(busyA ?? []), ...(busyB ?? [])]);
   const haveCalendar = busyA !== null || busyB !== null;
   const days = freeEvenings.length > 0 ? new Set(freeEvenings) : null; // null = any day
+  const from = freeFrom ?? `${String(eveningStartHour).padStart(2, "0")}:00`;
+  const to = freeTo ?? `${String(eveningEndHour).padStart(2, "0")}:00`;
 
   const out: Slot[] = [];
 
@@ -61,8 +68,8 @@ export function findSlots({
     date.setDate(date.getDate() + i);
     if (days && !days.has(date.getDay())) continue;
 
-    const windowStart = atHour(date, eveningStartHour);
-    const windowEnd = atHour(date, eveningEndHour);
+    const windowStart = atClock(date, from);
+    const windowEnd = atClock(date, to);
 
     // Longest uninterrupted stretch of that evening, once conflicts are cut out.
     const gap = longestGap(windowStart, windowEnd, busy);
@@ -123,10 +130,35 @@ function longestGap(
   return best;
 }
 
-function atHour(date: Date, hour: number): Date {
+function atClock(date: Date, hhmm: string): Date {
+  const [h, m] = hhmm.split(":").map((n) => Number(n));
   const d = new Date(date);
-  d.setHours(hour, 0, 0, 0);
+  d.setHours(Number.isFinite(h) ? h : 0, Number.isFinite(m) ? m : 0, 0, 0);
   return d;
+}
+
+/** Later start and earlier end. Falls back to `a` when the windows miss. */
+export function overlapWindows(
+  aFrom: string,
+  aTo: string,
+  bFrom: string,
+  bTo: string,
+): { freeFrom: string; freeTo: string } {
+  const start = Math.max(toMinutes(aFrom), toMinutes(bFrom));
+  const end = Math.min(toMinutes(aTo), toMinutes(bTo));
+  if (end <= start) return { freeFrom: aFrom, freeTo: aTo };
+  return { freeFrom: fromMinutes(start), freeTo: fromMinutes(end) };
+}
+
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map((n) => Number(n));
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+function fromMinutes(n: number): string {
+  const h = Math.floor(n / 60);
+  const m = n % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 function labelFor(start: Date, end: Date): string {

@@ -7,6 +7,7 @@ const TABS = [
   { href: "/discover", label: "Discover" },
   { href: "/import", label: "Import" },
   { href: "/passport", label: "Passport" },
+  { href: "/profile", label: "Profile" },
 ];
 
 export default function TabBar() {

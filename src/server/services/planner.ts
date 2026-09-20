@@ -8,7 +8,7 @@ import {
   type Candidates,
 } from "@/server/services/candidates";
 import { fetchBusy } from "@/server/external/calendar";
-import { findSlots } from "@/server/domain/availability";
+import { findSlots, overlapWindows } from "@/server/domain/availability";
 import type { Plan, Profile, Stamp } from "@/lib/types";
 
 /**
@@ -142,7 +142,14 @@ async function availableSlots(
   ]);
   if (busyA === null && busyB === null) return [];
 
-  return findSlots({ now, freeEvenings, busyA, busyB })
+  const { freeFrom, freeTo } = overlapWindows(
+    input.me.profile.freeFrom ?? "18:00",
+    input.me.profile.freeTo ?? "22:00",
+    input.them.profile.freeFrom ?? "18:00",
+    input.them.profile.freeTo ?? "22:00",
+  );
+
+  return findSlots({ now, freeEvenings, busyA, busyB, freeFrom, freeTo })
     .filter((s) => s.confident)
     .map((s) => s.label);
 }

@@ -63,8 +63,15 @@ export function requireMongoClientPromise() {
 
 export async function getDb(): Promise<Db | null> {
   if (!isDbConfigured()) return null;
-  const client = await connect();
-  return client.db(process.env.MONGODB_DB ?? "invisible-string");
+  try {
+    const client = await connect();
+    return client.db(process.env.MONGODB_DB ?? "invisible-string");
+  } catch (err) {
+    // URI set but Atlas unreachable (VPN, IP allowlist, cluster paused).
+    // Repos already treat null as "use the in-memory demo world".
+    console.error(err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /** Back-compat alias for callers still using the old name. */

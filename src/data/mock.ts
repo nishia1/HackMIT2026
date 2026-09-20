@@ -22,6 +22,8 @@ const profiles = new Map<string, Profile>([
       budget: "cheap",
       city: "Cambridge, MA",
       freeEvenings: [2, 4, 6], // Tue, Thu, Sat
+      freeFrom: "18:00",
+      freeTo: "22:00",
     },
   ],
   [
@@ -31,6 +33,8 @@ const profiles = new Map<string, Profile>([
       budget: "mid",
       city: "Cambridge, MA",
       freeEvenings: [4, 5, 6],
+      freeFrom: "18:00",
+      freeTo: "22:00",
     },
   ],
   [
@@ -40,6 +44,8 @@ const profiles = new Map<string, Profile>([
       budget: "free",
       city: "Seattle, WA", // different city on purpose — exercises the virtual path
       freeEvenings: [0, 6],
+      freeFrom: "18:00",
+      freeTo: "22:00",
     },
   ],
 ]);
@@ -120,6 +126,8 @@ export function getMockProfile(userId: string): Profile {
       budget: "cheap",
       city: null,
       freeEvenings: [],
+      freeFrom: "18:00",
+      freeTo: "22:00",
     }
   );
 }

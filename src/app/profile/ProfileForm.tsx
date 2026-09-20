@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { Budget, Profile } from "@/lib/types";
+import type { Budget, FreeWindow, Profile } from "@/lib/types";
+import ConnectedApps from "./ConnectedApps";
 
 /**
  * Everything the planner matches against, on one screen.
@@ -9,6 +10,9 @@ import type { Budget, Profile } from "@/lib/types";
  * rather than a number on purpose — "under $15 each" is a thing people can
  * answer honestly about themselves, and the matcher only ever compares the two
  * and takes the lower one.
+ *
+ * Availability is stored per day: each picked day carries its own from/to
+ * window, so "Tue 18:00–22:00, Sat 10:00–23:00" is expressible.
  */
 
 const BUDGETS: { value: Budget; label: string; hint: string }[] = [
@@ -26,7 +30,37 @@ const SUGGESTIONS = [
   "film photography", "pottery", "running", "museums", "cooking", "karaoke",
 ];
 
-const EMPTY: Profile = { interests: [], budget: "cheap", city: null, freeEvenings: [] };
+/** What a day gets when you first tap it. Editable per day afterwards. */
+const DEFAULT_WINDOW = { from: "18:00", to: "22:00" };
+
+const EMPTY: Profile = {
+  interests: [],
+  budget: "cheap",
+  city: null,
+  freeWindows: [],
+  connectedApps: {},
+};
+
+/** A hardcoded shortlist beats a free-text city typo the geocoder sends to
+ * the wrong country. "Other" drops back to typing it in. */
+const CITIES = [
+  "Cambridge, MA",
+  "Boston, MA",
+  "Atlanta, GA",
+  "Seattle, WA",
+  "New York, NY",
+  "San Francisco, CA",
+  "Austin, TX",
+  "Chicago, IL",
+];
+const OTHER = "__other__";
+
+/** Shape of a profile saved before per-day windows existed. */
+type LegacyProfile = Partial<Profile> & {
+  freeEvenings?: number[];
+  freeFrom?: string;
+  freeTo?: string;
+};
 
 export default function ProfileForm() {
   const [profile, setProfile] = useState<Profile>(EMPTY);
@@ -36,12 +70,29 @@ export default function ProfileForm() {
   const [paste, setPaste] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [pasteError, setPasteError] = useState<string | null>(null);
+  const [cityOther, setCityOther] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     fetch("/api/profile")
       .then((r) => r.json())
-      .then((p: Profile) => {
-        setProfile({ ...EMPTY, ...p });
+      .then((p: LegacyProfile) => {
+        // Migrate old profiles: one shared window applied to every picked day.
+        const freeWindows: FreeWindow[] =
+          p.freeWindows ??
+          (p.freeEvenings ?? []).map((day) => ({
+            day,
+            from: p.freeFrom ?? DEFAULT_WINDOW.from,
+            to: p.freeTo ?? DEFAULT_WINDOW.to,
+          }));
+        const next: Profile = {
+          ...EMPTY,
+          ...p,
+          freeWindows,
+          connectedApps: p.connectedApps ?? {},
+        };
+        setProfile(next);
+        setCityOther(Boolean(next.city && !CITIES.includes(next.city)));
         setStatus("idle");
       })
       .catch(() => setStatus("error"));
@@ -49,6 +100,7 @@ export default function ProfileForm() {
 
   const patch = (next: Partial<Profile>) => {
     setProfile((p) => ({ ...p, ...next }));
+    setDirty(true);
     setStatus("idle");
   };
 
@@ -66,6 +118,24 @@ export default function ProfileForm() {
     patch({ interests: [...profile.interests, value] });
     setDraft("");
   };
+
+  const toggleDay = (day: number) => {
+    const has = profile.freeWindows.some((w) => w.day === day);
+    patch({
+      freeWindows: has
+        ? profile.freeWindows.filter((w) => w.day !== day)
+        : [...profile.freeWindows, { day, ...DEFAULT_WINDOW }],
+    });
+  };
+
+  const updateWindow = (day: number, change: Partial<Pick<FreeWindow, "from" | "to">>) => {
+    patch({
+      freeWindows: profile.freeWindows.map((w) => (w.day === day ? { ...w, ...change } : w)),
+    });
+  };
+
+  const sortedWindows = [...profile.freeWindows].sort((a, b) => a.day - b.day);
+  const badWindow = sortedWindows.some((w) => w.to <= w.from);
 
   /** Merges what the model found into the chips, deduped. Nothing is saved yet. */
   const extract = async () => {
@@ -94,6 +164,7 @@ export default function ProfileForm() {
         return { ...p, interests: [...p.interests, ...found.filter((f) => !have.has(f.toLowerCase()))] };
       });
       setPaste("");
+      setDirty(true);
       setStatus("idle");
     } catch (e) {
       setPasteError(e instanceof Error ? e.message : "couldn't read that");
@@ -108,9 +179,10 @@ export default function ProfileForm() {
       const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify({ ...profile, freeWindows: sortedWindows }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "could not save");
+      setDirty(false);
       setStatus("saved");
     } catch (e) {
       setError(e instanceof Error ? e.message : "could not save");
@@ -121,7 +193,7 @@ export default function ProfileForm() {
   if (status === "loading") return <p className="pt-8 text-inkSoft">Loading&hellip;</p>;
 
   return (
-    <div className="space-y-8 pt-8">
+    <div className="space-y-6 pt-8">
       <header>
         <h1 className="font-display text-3xl">Your profile</h1>
         <p className="mt-2 text-inkSoft">
@@ -129,8 +201,14 @@ export default function ProfileForm() {
         </p>
       </header>
 
-      <section>
+      <ConnectedApps
+        initial={profile.connectedApps}
+        onChange={(connectedApps) => patch({ connectedApps })}
+      />
+
+      <section className="rounded-xl border border-ink/15 bg-paper p-5">
         <h2 className="font-display text-xl">What you&rsquo;re into</h2>
+        <p className="mt-1 text-inkSoft">Tap a chip to drop it. Add your own, or pick a suggestion.</p>
         <ul className="mt-3 flex flex-wrap gap-2">
           {profile.interests.map((interest) => (
             <li key={interest}>
@@ -192,9 +270,9 @@ export default function ProfileForm() {
         </ul>
       </section>
 
-      <section>
+      <section className="rounded-xl border border-ink/15 bg-paper p-5">
         <h2 className="font-display text-xl">Or paste anything</h2>
-        <p className="text-inkSoft">
+        <p className="mt-1 text-inkSoft">
           Your Beli list, your Letterboxd diary, a playlist, your bio. We&rsquo;ll pull the
           interests out and you can keep the ones that are right.
         </p>
@@ -220,9 +298,9 @@ export default function ProfileForm() {
         </button>
       </section>
 
-      <section>
+      <section className="rounded-xl border border-ink/15 bg-paper p-5">
         <h2 className="font-display text-xl">What you can spend</h2>
-        <p className="text-inkSoft">We always use the lower of the two budgets.</p>
+        <p className="mt-1 text-inkSoft">We always use the lower of the two budgets.</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {BUDGETS.map((b) => (
             <button
@@ -243,40 +321,63 @@ export default function ProfileForm() {
         </div>
       </section>
 
-      <section>
+      <section className="rounded-xl border border-ink/15 bg-paper p-5">
         <h2 className="font-display text-xl">Where you are</h2>
-        <input
-          value={profile.city ?? ""}
-          onChange={(e) => patch({ city: e.target.value || null })}
-          placeholder="Cambridge, MA"
-          aria-label="City"
-          className="mt-3 w-full rounded-md border border-ink/25 bg-paper px-3 py-2"
-        />
-        <p className="mt-2 text-sm text-inkSoft">
-          Add the state or country &mdash; plain &ldquo;Cambridge&rdquo; lands in England.
+        <p className="mt-1 text-inkSoft">
+          A shortlist, so the geocoder doesn&rsquo;t send a typo to the wrong country.
           Friends in another city get plans that work over a call.
         </p>
+        <label className="mt-3 block">
+          <span className="sr-only">City</span>
+          <select
+            value={cityOther ? OTHER : (profile.city ?? "")}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === OTHER) {
+                setCityOther(true);
+                if (!profile.city || CITIES.includes(profile.city)) patch({ city: null });
+                return;
+              }
+              setCityOther(false);
+              patch({ city: v || null });
+            }}
+            className="w-full rounded-md border border-ink/25 bg-paper px-3 py-2"
+          >
+            <option value="">Pick a city</option>
+            {CITIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+            <option value={OTHER}>Other&hellip;</option>
+          </select>
+        </label>
+        {cityOther && (
+          <input
+            value={profile.city ?? ""}
+            onChange={(e) => patch({ city: e.target.value || null })}
+            placeholder="City, State or country"
+            aria-label="Custom city"
+            className="mt-2 w-full rounded-md border border-ink/25 bg-paper px-3 py-2"
+          />
+        )}
       </section>
 
-      <section>
+      <section className="rounded-xl border border-ink/15 bg-paper p-5">
         <h2 className="font-display text-xl">Usually free</h2>
-        <div className="mt-3 flex gap-2">
+        <p className="mt-1 text-inkSoft">Pick your days, then set hours for each one.</p>
+
+        <div className="mt-3 grid grid-cols-7 gap-1.5">
           {DAYS.map((label, day) => {
-            const on = profile.freeEvenings.includes(day);
+            const on = profile.freeWindows.some((w) => w.day === day);
             return (
               <button
                 key={day}
                 type="button"
-                onClick={() =>
-                  patch({
-                    freeEvenings: on
-                      ? profile.freeEvenings.filter((d) => d !== day)
-                      : [...profile.freeEvenings, day],
-                  })
-                }
+                onClick={() => toggleDay(day)}
                 aria-pressed={on}
                 aria-label={DAY_NAMES[day]}
-                className={`h-11 w-11 rounded-full border font-display ${
+                className={`flex aspect-square w-full items-center justify-center rounded-full border font-display ${
                   on ? "border-ink bg-ink text-paper" : "border-ink/25 text-inkSoft"
                 }`}
               >
@@ -285,13 +386,66 @@ export default function ProfileForm() {
             );
           })}
         </div>
+
+        {sortedWindows.length > 0 && (
+          <ul className="mt-4 space-y-2">
+            {sortedWindows.map((w) => {
+              const invalid = w.to <= w.from;
+              return (
+                <li key={w.day}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-12 shrink-0 font-display">
+                      {DAY_NAMES[w.day].slice(0, 3)}
+                    </span>
+                    <input
+                      type="time"
+                      value={w.from}
+                      onChange={(e) =>
+                        updateWindow(w.day, {
+                          from: (e.target.value || DEFAULT_WINDOW.from).slice(0, 5),
+                        })
+                      }
+                      aria-label={`${DAY_NAMES[w.day]} from`}
+                      className="min-w-0 flex-1 rounded-md border border-ink/25 bg-paper px-2 py-2"
+                    />
+                    <span className="text-inkSoft">–</span>
+                    <input
+                      type="time"
+                      value={w.to}
+                      onChange={(e) =>
+                        updateWindow(w.day, {
+                          to: (e.target.value || DEFAULT_WINDOW.to).slice(0, 5),
+                        })
+                      }
+                      aria-label={`${DAY_NAMES[w.day]} to`}
+                      className="min-w-0 flex-1 rounded-md border border-ink/25 bg-paper px-2 py-2"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleDay(w.day)}
+                      aria-label={`Remove ${DAY_NAMES[w.day]}`}
+                      className="px-1 text-inkSoft"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {invalid && (
+                    <p className="mt-1 pl-14 text-sm text-string">
+                      End time needs to be after start.
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
-      <div className="sticky bottom-24 pt-2">
+      <div className="pt-2 pb-24">
         <button
           type="button"
           onClick={save}
-          disabled={status === "saving"}
+          disabled={status === "saving" || badWindow}
           className="w-full rounded-md bg-string px-4 py-3 text-paper disabled:opacity-60"
         >
           {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Save profile"}

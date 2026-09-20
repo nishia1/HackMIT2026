@@ -137,6 +137,8 @@ export function buildWorld(anchor: Date): World {
       budget: p.budget,
       city: p.city,
       freeEvenings: p.freeEvenings,
+      freeFrom: "18:00",
+      freeTo: "22:00",
     },
   }));
 
