@@ -14,7 +14,8 @@ import type { Profile } from "@/lib/types";
  */
 
 export async function POST(req: Request) {
-  let body: { personId?: string; now?: string; theirEmail?: string };
+  let body: { personId?: string; now?: string; theirEmail?: string;   profile?: { interests?: string[]; city?: string | null; days?: string[] };
+ };
   try {
     body = await req.json();
   } catch {
@@ -72,6 +73,17 @@ export async function POST(req: Request) {
   };
   const stamps = MOCK_STAMPS[personId] ?? [];
   // ---- END SEAM --------------------------------------------------------
+
+  // Extra context pasted in the harness. Layered over their saved profile
+// for this request only. Nothing is saved.
+  const extra = body.profile;
+  if (extra) {
+    them.profile = {
+      ...them.profile,
+      interests: [...new Set([...(extra.interests ?? []), ...(them.profile.interests ?? [])])],
+      ...(extra.city ? { city: extra.city } : {}),
+    };
+  }
 
   const result = await planMeetup({ me, them, stamps, now });
 

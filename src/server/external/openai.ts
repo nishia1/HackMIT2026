@@ -273,9 +273,10 @@ export async function planFor({
  * get OAuth for, and it's the thing that still works when a live OAuth flow
  * dies on stage.
  * ------------------------------------------------------------------ */
-
-export async function extractInterests(text: string): Promise<{ interests: string[] }> {
-  return callJSON<{ interests: string[] }>({
+export async function extractInterests(
+  text: string,
+): Promise<{ interests: string[]; city: string | null; days: string[] }> {
+  return callJSON<{ interests: string[]; city: string | null; days: string[] }>({
     name: "extracted_interests",
     schema: {
       type: "object",
@@ -285,8 +286,17 @@ export async function extractInterests(text: string): Promise<{ interests: strin
           description: "at most 10",
           items: { type: "string", description: "1-3 words, lowercase" },
         },
+        city: { type: ["string", "null"], description: "city they live in, only if supported" },
+        days: {
+          type: "array",
+          description: "weekdays the text says they are free",
+          items: {
+            type: "string",
+            enum: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+          },
+        },
       },
-      required: ["interests"],
+      required: ["interests", "city", "days"],
       additionalProperties: false,
     },
     system: [
@@ -298,6 +308,10 @@ export async function extractInterests(text: string): Promise<{ interests: strin
       "  not four restaurant names.",
       "- Prefer things two people could plan around: 'bouldering', 'live music',",
       "  'natural wine'. Skip traits like 'curious' or 'creative'.",
+      "- `city`: only if the text says where they live, or every place in it is clearly",
+      "  in one city. Otherwise null.",
+      "- `days`: only weekdays the text says they are free ('free weekends' means",
+      "  saturday and sunday). Empty list if not stated.",
       "- Only what the text supports. An empty list is a fine answer.",
     ].join("\n"),
     user: text.slice(0, 6000),
