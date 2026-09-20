@@ -5,8 +5,10 @@ import { type GroupChatMember } from "@/lib/groupChatMembers";
  * coordinates and emitted as percentages, so the whole graph scales with the
  * container while keeping the Figma proportions exactly.
  */
-const FRAME_W = 412;
-const FRAME_H = 800;
+// const FRAME_W = 412;
+// const FRAME_H = 800;
+const FRAME_W = 112;
+const FRAME_H = 96;
 /**
  * Empty grid below the graph, in the same units. The people and their boxes
  * all live in the top FRAME_H; this is just paper underneath them, so the
