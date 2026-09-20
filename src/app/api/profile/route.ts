@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Budget, Profile } from "@/lib/types";
-import { MOCK_ME_ID, getMockProfile, setMockProfile } from "@/data/mock";
+import { auth } from "@/auth";
+import { appDb } from "@/server/db/client";
 
 /**
  * GET  /api/profile  →  Profile
@@ -12,10 +13,14 @@ import { MOCK_ME_ID, getMockProfile, setMockProfile } from "@/data/mock";
  */
 
 const BUDGETS: Budget[] = ["free", "cheap", "mid", "splurge"];
+const EMPTY: Profile = { interests: [], budget: "cheap", city: null, freeEvenings: [] };
 
 export async function GET() {
-  // ---- SEAM: swap for repo.users.find(session.userId) at hour 3 ----
-  return NextResponse.json(getMockProfile(MOCK_ME_ID));
+  const email = await signedInEmail();
+  if (!email) return NextResponse.json({ error: "sign in required" }, { status: 401 });
+  const db = await appDb();
+  const user = await db.collection("users").findOne({ email });
+  return NextResponse.json((user?.profile as Profile | undefined) ?? EMPTY);
 }
 
 export async function PUT(req: Request) {
@@ -29,8 +34,21 @@ export async function PUT(req: Request) {
   const parsed = parseProfile(body);
   if ("error" in parsed) return NextResponse.json(parsed, { status: 400 });
 
-  // ---- SEAM: swap for repo.users.setProfile(session.userId, …) ----
-  return NextResponse.json(setMockProfile(MOCK_ME_ID, parsed.profile));
+  const email = await signedInEmail();
+  if (!email) return NextResponse.json({ error: "sign in required" }, { status: 401 });
+  const db = await appDb();
+  const result = await db.collection("users").findOneAndUpdate(
+    { email },
+    { $set: { profile: parsed.profile } },
+    { returnDocument: "after" },
+  );
+  if (!result) return NextResponse.json({ error: "account not found" }, { status: 404 });
+  return NextResponse.json(parsed.profile);
+}
+
+async function signedInEmail(): Promise<string | null> {
+  const session = await auth();
+  return session?.user?.email ?? null;
 }
 
 function parseProfile(input: unknown): { profile: Profile } | { error: string } {

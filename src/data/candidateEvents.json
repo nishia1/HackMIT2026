@@ -1,0 +1,92 @@
+[
+  {
+    "name": "MIT List Center late-night gallery hours",
+    "kind": "art",
+    "when": null,
+    "venue": "List Visual Arts Center",
+    "priceHint": "free",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Central Square open mic",
+    "kind": "music",
+    "when": null,
+    "venue": "Cantab Lounge",
+    "priceHint": "cheap",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Thursday bouldering social",
+    "kind": "sport",
+    "when": null,
+    "venue": "Central Rock Gym",
+    "priceHint": "mid",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Harvard Art Museums free evening",
+    "kind": "art",
+    "when": null,
+    "venue": "Harvard Art Museums",
+    "priceHint": "free",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Board game night",
+    "kind": "games",
+    "when": null,
+    "venue": "Knight Moves Cafe",
+    "priceHint": "cheap",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Charles River sunset walk",
+    "kind": "outdoors",
+    "when": null,
+    "venue": "Memorial Drive",
+    "priceHint": "free",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Somerville Open Studios",
+    "kind": "art",
+    "when": "2026-10-17T11:00:00Z",
+    "venue": "Somerville",
+    "priceHint": "free",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Head of the Charles Regatta",
+    "kind": "sport",
+    "when": "2026-10-24T08:00:00Z",
+    "venue": "Charles River",
+    "priceHint": "free",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Cambridge Winter Market opening",
+    "kind": "other",
+    "when": "2026-11-28T10:00:00Z",
+    "venue": "Cambridge Common",
+    "priceHint": "free",
+    "url": null,
+    "city": "Cambridge, MA"
+  },
+  {
+    "name": "Late-night ramen crawl, Porter Square",
+    "kind": "food",
+    "when": null,
+    "venue": "Porter Square",
+    "priceHint": "cheap",
+    "url": null,
+    "city": "Cambridge, MA"
+  }
+]

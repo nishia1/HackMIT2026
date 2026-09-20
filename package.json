@@ -8,10 +8,16 @@
     "start": "next start",
     "lint": "next lint",
     "check": "tsc --noEmit",
-    "verify": "tsx scripts/verify-demo.ts"
+    "verify": "tsx scripts/verify-demo.ts",
+    "check:calendar": "tsx --env-file=.env.local scripts/check-calendar.ts",
+    "peek:db": "tsx --env-file=.env.local scripts/peek-db.ts"
   },
   "dependencies": {
+    "@auth/mongodb-adapter": "^3.11.3",
+    "mongodb": "^7.6.0",
+    "mongosh": "^2.12.0",
     "next": "^15.0.3",
+    "next-auth": "^5.0.0-beta.32",
     "openai": "^7.20.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

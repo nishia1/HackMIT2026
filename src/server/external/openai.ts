@@ -19,14 +19,21 @@ import { EVENT_KINDS } from "@/lib/types";
  *      hallucinates a memory produces a dropped plan, not a lie on screen.
  */
 
-const MODEL = "gpt-4o-mini";
+/**
+ * Both overridable, so a different provider is a config change rather than a
+ * code change. Anything speaking the OpenAI chat-completions shape works —
+ * point `OPENAI_BASE_URL` at it and set `LLM_MODEL`. Check the provider
+ * supports json_schema response formats before you switch; if it only does
+ * `json_object`, this file needs a small branch.
+ */
+const MODEL = process.env.LLM_MODEL || "gpt-4o-mini";
 
 let client: OpenAI | null = null;
 function openai() {
   if (!client) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-    client = new OpenAI({ apiKey });
+    client = new OpenAI({ apiKey, baseURL: process.env.OPENAI_BASE_URL || undefined });
   }
   return client;
 }
@@ -177,10 +184,12 @@ export async function stampFor(
 export async function planFor({
   constraintsJson,
   stampsJson,
+  candidatesJson,
   theirName,
 }: {
   constraintsJson: string;
   stampsJson: string;
+  candidatesJson: string | null;
   theirName: string;
 }): Promise<{ plans: Plan[] }> {
   return callJSON<{ plans: Plan[] }>({
@@ -222,19 +231,82 @@ export async function planFor({
       "- Every plan must cite one by its eventId in becauseStampId.",
       "- Respect the budget ceiling exactly. It is the poorer friend's limit, not a suggestion.",
       "- If virtual is true they are in different cities: every plan must work over a call.",
-      "- Only use the days in `evenings`. If that list is empty, say 'sometime soon'.",
-      "- Be concrete. 'Dinner' is useless; 'the ramen place you went to in March' is a plan.",
+      "- If `slots` is non-empty, `when` must be one of those strings copied exactly —",
+      "  they are real gaps in both calendars. Otherwise use a day from `evenings`,",
+      "  and if that is empty too, say 'sometime soon'.",
       "- No emoji, no exclamation marks, no 'reconnect' or 'catch up vibes'. Write like a friend texting.",
+      "",
+      "About `where`:",
+      "- If nearby places or events are provided, put the exact name of one in `where`.",
+      "  Copy it character for character. A place that does not exist sends someone",
+      "  to the wrong address, so a wrong name is worse than an empty field.",
+      "- Match `serves` to what you're proposing. A place that serves pizza is not",
+      "  where you go for ramen. If nothing on the list serves the right thing,",
+      "  change the plan to match a place that does, or set `where` to null.",
+      "- If nothing in the list fits the plan, set `where` to null. Never invent a venue.",
       "",
       "Make the three plans genuinely different from each other — not one idea three ways.",
     ].join("\n"),
-    user: `Their name: ${theirName}\n\nConstraints:\n${constraintsJson}\n\nShared memories:\n${stampsJson}`,
+    user: [
+      `Their name: ${theirName}`,
+      ``,
+      `Constraints:`,
+      constraintsJson,
+      ``,
+      `Shared memories:`,
+      stampsJson,
+      ``,
+      candidatesJson
+        ? `Nearby places and events you may name in \`where\`:\n${candidatesJson}`
+        : `No venue list available — set \`where\` to null on every plan.`,
+    ].join("\n"),
     temperature: 0.8,
   });
 }
 
 /* ------------------------------------------------------------------ *
- * 4 & 5. Copy. Devs 2 and 3 ship templates; these replace them at hour 8.
+ * 4. Paste anything → interests.
+ *
+ * The universal connector. Beli has no API, Letterboxd has no API, Goodreads
+ * shut theirs down and Instagram's is business-accounts-only — but all of
+ * them let you copy text out. One paste box covers every service we'll never
+ * get OAuth for, and it's the thing that still works when a live OAuth flow
+ * dies on stage.
+ * ------------------------------------------------------------------ */
+
+export async function extractInterests(text: string): Promise<{ interests: string[] }> {
+  return callJSON<{ interests: string[] }>({
+    name: "extracted_interests",
+    schema: {
+      type: "object",
+      properties: {
+        interests: {
+          type: "array",
+          description: "at most 10",
+          items: { type: "string", description: "1-3 words, lowercase" },
+        },
+      },
+      required: ["interests"],
+      additionalProperties: false,
+    },
+    system: [
+      "You read a messy dump of someone's taste — a restaurant list, a film diary,",
+      "a playlist, a bio, anything — and pull out what they are actually into.",
+      "",
+      "- 1 to 3 words each, lowercase, at most 10.",
+      "- Name the *interest*, not the item. Four ramen places means 'ramen',",
+      "  not four restaurant names.",
+      "- Prefer things two people could plan around: 'bouldering', 'live music',",
+      "  'natural wine'. Skip traits like 'curious' or 'creative'.",
+      "- Only what the text supports. An empty list is a fine answer.",
+    ].join("\n"),
+    user: text.slice(0, 6000),
+    temperature: 0.3,
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * 5 & 6. Copy. Devs 2 and 3 ship templates; these replace them at hour 8.
  * ------------------------------------------------------------------ */
 
 export async function nudgeCopy({

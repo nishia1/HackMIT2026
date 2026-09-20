@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { planMeetup } from "@/server/services/planner";
 import { MOCK_ME_ID, MOCK_PEOPLE, MOCK_STAMPS, getMockProfile } from "@/data/mock";
+import { auth } from "@/auth";
+import { appDb } from "@/server/db/client";
+import { calendarTokenFor } from "@/server/external/google-auth";
+import type { Profile } from "@/lib/types";
 
 /**
  * POST /api/plan  { personId, now? }  →  { plans, constraints, source }
@@ -10,7 +14,7 @@ import { MOCK_ME_ID, MOCK_PEOPLE, MOCK_STAMPS, getMockProfile } from "@/data/moc
  */
 
 export async function POST(req: Request) {
-  let body: { personId?: string; now?: string };
+  let body: { personId?: string; now?: string; theirEmail?: string };
   try {
     body = await req.json();
   } catch {
@@ -21,6 +25,11 @@ export async function POST(req: Request) {
   if (!personId) {
     return NextResponse.json({ error: "personId is required" }, { status: 400 });
   }
+
+  // Optional, for testing real two-person calendar overlap before the
+  // friends/connections concept exists: pass the second signed-in user's
+  // email and their real Google Calendar token gets pulled in too.
+  const theirEmail = body.theirEmail?.trim().toLowerCase() || null;
 
   // `?now=` / `now` is the demo's time machine: it lets us show a string that
   // has gone cold without waiting eight months for it to happen.
@@ -37,8 +46,27 @@ export async function POST(req: Request) {
   const person = MOCK_PEOPLE[personId];
   if (!person) return NextResponse.json({ error: "no such person" }, { status: 404 });
 
-  const me = { name: "You", profile: getMockProfile(MOCK_ME_ID) };
-  const them = { personId, name: person.name, profile: getMockProfile(personId) };
+  const session = await auth();
+  const email = session?.user?.email ?? null;
+  const db = await appDb();
+  const currentUser = email ? await db.collection("users").findOne({ email }) : null;
+  const meProfile = (currentUser?.profile as Profile | undefined) ?? getMockProfile(MOCK_ME_ID);
+  const myCalendarToken = email ? await calendarTokenFor(email) : null;
+
+  const me = {
+    name: session?.user?.name ?? "You",
+    profile: meProfile,
+    accessToken: myCalendarToken,
+  };
+  const theirUser = theirEmail ? await db.collection("users").findOne({ email: theirEmail }) : null;
+  const theirCalendarToken = theirEmail ? await calendarTokenFor(theirEmail) : null;
+
+  const them = {
+    personId,
+    name: theirUser?.name ?? person.name,
+    profile: (theirUser?.profile as Profile | undefined) ?? getMockProfile(personId),
+    accessToken: theirCalendarToken,
+  };
   const stamps = MOCK_STAMPS[personId] ?? [];
   // ---- END SEAM --------------------------------------------------------
 
@@ -48,6 +76,9 @@ export async function POST(req: Request) {
     personId,
     name: person.name,
     ...result,
+    // Whether each side's real calendar was actually used, so testing two
+    // real Google accounts doesn't require reading server logs to confirm.
+    calendars: { me: Boolean(myCalendarToken), them: Boolean(theirCalendarToken) },
     // Send the stamps back so the client can render "because …" without a
     // second round trip.
     stamps: stamps.map((s) => ({ eventId: s.eventId, title: s.title, emoji: s.emoji })),

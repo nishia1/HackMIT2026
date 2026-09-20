@@ -20,7 +20,7 @@ const profiles = new Map<string, Profile>([
     {
       interests: ["ramen", "bouldering", "live music", "film photography"],
       budget: "cheap",
-      city: "Cambridge",
+      city: "Cambridge, MA",
       freeEvenings: [2, 4, 6], // Tue, Thu, Sat
     },
   ],
@@ -29,7 +29,7 @@ const profiles = new Map<string, Profile>([
     {
       interests: ["ramen", "pottery", "live music", "long walks"],
       budget: "mid",
-      city: "Cambridge",
+      city: "Cambridge, MA",
       freeEvenings: [4, 5, 6],
     },
   ],
@@ -38,7 +38,7 @@ const profiles = new Map<string, Profile>([
     {
       interests: ["bouldering", "board games", "coffee"],
       budget: "free",
-      city: "Seattle", // different city on purpose — exercises the virtual path
+      city: "Seattle, WA", // different city on purpose — exercises the virtual path
       freeEvenings: [0, 6],
     },
   ],

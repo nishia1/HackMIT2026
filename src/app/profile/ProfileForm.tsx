@@ -33,6 +33,9 @@ export default function ProfileForm() {
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<"loading" | "idle" | "saving" | "saved" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
+  const [paste, setPaste] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/profile")
@@ -62,6 +65,41 @@ export default function ProfileForm() {
     setError(null);
     patch({ interests: [...profile.interests, value] });
     setDraft("");
+  };
+
+  /** Merges what the model found into the chips, deduped. Nothing is saved yet. */
+  const extract = async () => {
+    if (!paste.trim()) {
+      setPasteError("Paste something first.");
+      return;
+    }
+    setExtracting(true);
+    setPasteError(null);
+    try {
+      const res = await fetch("/api/profile/extract", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: paste }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "couldn't read that");
+
+      const found: string[] = json.interests ?? [];
+      if (found.length === 0) {
+        setPasteError("Nothing obvious in there. Try adding a few by hand.");
+        return;
+      }
+      setProfile((p) => {
+        const have = new Set(p.interests.map((i) => i.toLowerCase()));
+        return { ...p, interests: [...p.interests, ...found.filter((f) => !have.has(f.toLowerCase()))] };
+      });
+      setPaste("");
+      setStatus("idle");
+    } catch (e) {
+      setPasteError(e instanceof Error ? e.message : "couldn't read that");
+    } finally {
+      setExtracting(false);
+    }
   };
 
   const save = async () => {
@@ -155,6 +193,34 @@ export default function ProfileForm() {
       </section>
 
       <section>
+        <h2 className="font-display text-xl">Or paste anything</h2>
+        <p className="text-inkSoft">
+          Your Beli list, your Letterboxd diary, a playlist, your bio. We&rsquo;ll pull the
+          interests out and you can keep the ones that are right.
+        </p>
+        <textarea
+          value={paste}
+          onChange={(e) => {
+            setPaste(e.target.value);
+            if (pasteError) setPasteError(null);
+          }}
+          rows={4}
+          placeholder="paste here"
+          aria-label="Paste text to extract interests from"
+          className="mt-3 w-full resize-y rounded-md border border-ink/25 bg-paper px-3 py-2"
+        />
+        {pasteError && <p className="mt-2 text-sm text-string">{pasteError}</p>}
+        <button
+          type="button"
+          onClick={extract}
+          disabled={extracting}
+          className="mt-2 w-full rounded-md border border-ink/30 px-4 py-2 disabled:opacity-60"
+        >
+          {extracting ? "Reading…" : "Read it"}
+        </button>
+      </section>
+
+      <section>
         <h2 className="font-display text-xl">What you can spend</h2>
         <p className="text-inkSoft">We always use the lower of the two budgets.</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -182,11 +248,12 @@ export default function ProfileForm() {
         <input
           value={profile.city ?? ""}
           onChange={(e) => patch({ city: e.target.value || null })}
-          placeholder="Cambridge"
+          placeholder="Cambridge, MA"
           aria-label="City"
           className="mt-3 w-full rounded-md border border-ink/25 bg-paper px-3 py-2"
         />
         <p className="mt-2 text-sm text-inkSoft">
+          Add the state or country &mdash; plain &ldquo;Cambridge&rdquo; lands in England.
           Friends in another city get plans that work over a call.
         </p>
       </section>
