@@ -288,21 +288,24 @@ function StringTile({
         flipped={flipped}
       />
 
-      {labels.map((label, i) => (
-        <Link
-          key={i}
-          href={`/group-chat/main-${index}-${i}`}
-          className="absolute break-words text-center font-mono font-bold text-[16px] leading-[1.2] text-[#c40505] hover:underline"
-          style={{
-            left: `${label.left}%`,
-            top: `${label.top}%`,
-            width: `${label.width}%`,
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <ConnectionLabelText id={`main-${index}-${i}`} mode={mode} />
-        </Link>
-      ))}
+      {labels.map((label, i) => {
+        const labelId = `main-${index}-${i}`;
+        return (
+          <Link
+            key={i}
+            href={mode === "individual" ? `/individual/${labelId}` : `/group-chat/${labelId}`}
+            className="absolute break-words text-center font-mono font-bold text-[16px] leading-[1.2] text-[#c40505] hover:underline"
+            style={{
+              left: `${label.left}%`,
+              top: `${label.top}%`,
+              width: `${label.width}%`,
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <ConnectionLabelText id={labelId} mode={mode} />
+          </Link>
+        );
+      })}
     </div>
   );
 }
