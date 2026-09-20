@@ -67,10 +67,11 @@ export function constraintsFor(
   const bSet = new Set(b.interests.map(normalize));
   const shared = a.interests.filter((i) => bSet.has(normalize(i)));
 
-  const evenings = a.freeEvenings
-    .filter((d) => b.freeEvenings.includes(d))
-    .sort((x, y) => x - y)
-    .map((d) => DAY_NAMES[d])
+  const bDays = new Set(b.freeWindows.map((w) => w.day));
+  const evenings = a.freeWindows
+    .filter((w) => bDays.has(w.day))
+    .sort((x, y) => x.day - y.day)
+    .map((w) => DAY_NAMES[w.day])
     .filter(Boolean);
 
   // Same city or no city on file at all — we only force virtual when we
