@@ -1,26 +1,18 @@
-import { loadCircle } from "@/lib/world";
-import CircleView from "./CircleView";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useState } from "react";
+import GroupIndividualToggle, { type ViewMode } from "@/components/GroupIndividualToggle";
+import InfiniteMainString from "@/components/InfiniteMainString";
 
-/**
- * The data is fetched here and handed down, so `?now=2026-12-31` is just a
- * search param the server reads — no client state, no refetch.
- */
-export default async function CirclePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ now?: string }>;
-}) {
-  const { now } = await searchParams;
-  const circle = await loadCircle(now);
+export default function CirclePage() {
+  const [mode, setMode] = useState<ViewMode>("group");
+
   return (
-    <div className="pt-8">
-      <h1 className="font-display text-3xl">Your circle</h1>
-      <p className="mt-1 text-inkSoft">
-        Thickness is how much you&rsquo;ve done together. Colour is how recent.
-      </p>
-      <CircleView {...circle} />
+    <div>
+      <div className="sticky top-4 z-30 flex justify-center">
+        <GroupIndividualToggle mode={mode} onChange={setMode} />
+      </div>
+      <InfiniteMainString mode={mode} />
     </div>
   );
 }
