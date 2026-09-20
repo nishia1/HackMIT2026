@@ -12,6 +12,10 @@ type PlanResponse = {
   stamps: { eventId: string; title: string; emoji: string }[];
 };
 
+// DEMO MODE: /api/plan only knows these people right now.
+// Delete this and `apiPersonId` below once the API can resolve real IDs.
+const DEMO_IDS = ["maya", "jordan"];
+
 /**
  * Where "Make a plan" lands: three things you could actually do with one
  * person, each grounded in something you already did together.
@@ -24,11 +28,10 @@ type PlanResponse = {
 export default function PlanForPerson({
   personId,
   name,
-  now,
 }: {
   personId: string;
   name: string;
-  now?: string;
+  now?: string; // accepted so existing callers don't break; not sent in demo mode
 }) {
   const [data, setData] = useState<PlanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,16 +39,36 @@ export default function PlanForPerson({
   useEffect(() => {
     let cancelled = false;
 
+    // Real IDs from the route won't exist in the API's data yet,
+    // so fall back to maya. Swap this out when it's actually connected.
+    const apiPersonId = DEMO_IDS.includes(personId) ? personId : "maya";
+
     (async () => {
       try {
         const res = await fetch("/api/plan", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ personId, now }),
+          body: JSON.stringify({ personId: apiPersonId }), // same body shape as the harness
         });
-        const json = await res.json();
+        // A body that isn't JSON — an empty 500, an auth redirect to HTML —
+        // must not surface as a parser error, which says nothing about what
+        // broke.
+        const text = await res.text();
+        let json: (PlanResponse & { error?: string }) | null = null;
+        try {
+          json = text ? JSON.parse(text) : null;
+        } catch {
+          json = null;
+        }
         if (cancelled) return;
-        if (!res.ok) throw new Error(json.error ?? "Could not make a plan");
+        if (!res.ok || !json) {
+          throw new Error(
+            json?.error ??
+              (res.status === 401
+                ? "Sign in to make a plan"
+                : `Could not make a plan (${res.status})`),
+          );
+        }
         setData(json);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Could not make a plan");
@@ -55,15 +78,17 @@ export default function PlanForPerson({
     return () => {
       cancelled = true;
     };
-  }, [personId, now]);
+  }, [personId]);
 
   return (
     <div className="pt-8">
+      {/* Keeps the real route's personId and name so the link still goes to the right page */}
       <Link href={`/individual/${personId}`} className="text-inkSoft underline">
         &larr; Back to {name}
       </Link>
 
-      <h1 className="mt-4 font-display text-3xl">Ways to see {name}</h1>
+      {/* Uses the API's name so the heading matches the (demo) plans below */}
+      <h1 className="mt-4 font-display text-3xl">Ways to see your friend</h1>
 
       <div className="mt-6">
         {error ? (

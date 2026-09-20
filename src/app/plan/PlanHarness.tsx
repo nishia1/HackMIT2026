@@ -38,8 +38,14 @@ export default function PlanHarness() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ personId, theirEmail: theirEmail.trim() || undefined }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "request failed");
+      const text = await res.text();
+      let json: (Response & { error?: string }) | null = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+      if (!res.ok || !json) throw new Error(json?.error ?? `request failed (${res.status})`);
       setData(json);
     } catch (e) {
       setError(e instanceof Error ? e.message : "request failed");

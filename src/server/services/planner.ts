@@ -74,19 +74,22 @@ export async function planMeetup(input: PlanInput): Promise<PlanResult> {
     slots,
   });
 
-  // Nothing to cite means nothing to ground a plan in. Templates are honest
-  // here in a way the model wouldn't be — it would happily invent a memory.
-  if (input.stamps.length === 0 || !aiAvailable()) {
-    return fallback(NO_CANDIDATES, await availableSlots(input, constraints, now));
-  }
-
-  // Real venues, so "get dinner somewhere" can become a restaurant with a name.
-  // Never fatal: no city, a dead Overpass mirror or no key all just mean the
-  // model is told to leave `where` null.
+  // Real venues, so "get dinner somewhere" can become a restaurant with a
+  // name. Gathered before we know which path we're on, because the templates
+  // want them just as much as the model does — "karaoke at Sing Sing" is worth
+  // having on the day the model is down. Never fatal: no city, a dead Overpass
+  // mirror or no key all just mean `where` stays null.
   const [candidates, slots] = await Promise.all([
     gatherCandidates(constraints).catch(() => NO_CANDIDATES),
     availableSlots(input, constraints, now),
   ]);
+
+  // Nothing to cite means nothing to ground a plan in. Templates are honest
+  // here in a way the model wouldn't be — it would happily invent a memory.
+  if (input.stamps.length === 0 || !aiAvailable()) {
+    return fallback(candidates, slots);
+  }
+
   const hasCandidates = candidates.places.length + candidates.events.length > 0;
 
   try {

@@ -20,16 +20,27 @@ export async function withUser<T>(
     const userId = await requireUserId();
     return NextResponse.json(await handler(userId));
   } catch (err) {
-    if (err instanceof UnauthorizedError) {
-      return NextResponse.json({ error: err.message }, { status: 401 });
-    }
-    if (err instanceof NotConnectedError) {
-      return NextResponse.json({ error: err.message, needs: "dropbox" }, { status: 409 });
-    }
-    if (err instanceof NoFolderError) {
-      return NextResponse.json({ error: err.message, needs: "folder" }, { status: 409 });
-    }
-    const message = err instanceof Error ? err.message : "Something went wrong";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return errorResponse(err);
   }
+}
+
+/**
+ * The same mapping, for routes that can't use `withUser` because they return
+ * their own status codes along the way. Every route must end up here rather
+ * than letting a throw escape: an uncaught error is a 500 with an empty body,
+ * and an empty body is what makes the client say "Unexpected end of JSON
+ * input" instead of what actually went wrong.
+ */
+export function errorResponse(err: unknown): NextResponse {
+  if (err instanceof UnauthorizedError) {
+    return NextResponse.json({ error: err.message }, { status: 401 });
+  }
+  if (err instanceof NotConnectedError) {
+    return NextResponse.json({ error: err.message, needs: "dropbox" }, { status: 409 });
+  }
+  if (err instanceof NoFolderError) {
+    return NextResponse.json({ error: err.message, needs: "folder" }, { status: 409 });
+  }
+  const message = err instanceof Error ? err.message : "Something went wrong";
+  return NextResponse.json({ error: message }, { status: 502 });
 }

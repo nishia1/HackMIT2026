@@ -150,7 +150,7 @@ export default function PlanCard({ name, plans, onPick }: PlanCardProps) {
             placed ? "border border-ink/25 bg-paper text-inkSoft" : "bg-ink text-paper"
           }`}
         >
-          {placed ? `Placed on ${name}’s calendar` : "Place it"}
+          {placed ? `Placed on calendar` : "Place it"}
         </button>
       </div>
     </section>
